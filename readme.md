@@ -57,7 +57,7 @@
  >​ 在登陆页面设置资源路径：/data/resources
 
 # 使用
-  python环境启动
+  Python3.10环境启动(推荐3.10，Pyside6对高版本Python支持不友好)
 ``` bash
 git clone https://github.com/georgewangchn/VetVoice.git
 cd VetVoice
