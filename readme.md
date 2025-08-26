@@ -72,7 +72,13 @@ python main.py
   - 设置 大模型openai形式接口参数）
   - 重启
   - 开始使用
-
+# TODO计划
+  - pyinstaller打包windows/ubuntu/macos平台安装包
+  - 采用fastapi开发http控制接口：当前病例号/开始录音/停止录音/辅诊/检查确诊/推荐用药/质检/电子病历等
+  - 采用fastmcp开发对话agent，电子病历流程从人控制转向大模型控制
+  - 推荐用户分享样本训练模型提升效果
+  - 性能优化
+  
 # 致谢
   感谢以下优秀开源项目的支持：
 
