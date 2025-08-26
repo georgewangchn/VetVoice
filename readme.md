@@ -84,9 +84,11 @@ python main.py
 
 
 
-# [Apache License2.0](LICENSE)
+# Apache License 2.0
+  [LICENSE](LICENSE)
+
   VetVoice 还包含多种第三方组件及从其他代码库修改而来的部分代码（这些内容遵循其他开源许可证）。
-预训练模型的使用需遵守相应模型的许可证要求。
+  预训练模型的使用需遵守相应模型的许可证要求。
 
 ## Star History
 
