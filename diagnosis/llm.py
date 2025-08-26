@@ -4,9 +4,9 @@ from openai import OpenAI
 from settings import cfg
 from loguru import logger
 from diagnosis.template import *
-API_KEY=cfg.get("llm", "api_key"),
+API_KEY=cfg.get("llm", "api_key")
 BASE_URL=cfg.get("llm", "api_base")
-MODEL=cfg.get("llm", "model"),
+MODEL=cfg.get("llm", "model")
 TEMPLATE_MAP = {
     "🩺 辅诊": {
         "生成": DIAGNOSE_TEMPLATE,
@@ -82,6 +82,7 @@ class LLMManager(QObject):
         )
 
         try:
+            print(API_KEY,BASE_URL,MODEL,self.dialogue_text_lst)
             stream = client.chat.completions.create(
                 model=MODEL,
                 messages=[{
@@ -95,6 +96,7 @@ class LLMManager(QObject):
             for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     self.stream_signal.emit(tab_name, chunk.choices[0].delta.content)
+                    print(chunk.choices[0].delta.content)
         except Exception as e:
             logger.exception(f"LLM 调用失败: {e}")
         finally:
