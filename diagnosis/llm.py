@@ -1,9 +1,12 @@
 from PySide6.QtCore import QObject, Signal
 from threading import Thread
-from openai import OpenAI
 from settings import cfg
 from loguru import logger
+import httpx
+import asyncio
+import json
 from diagnosis.template import *
+import traceback
 API_KEY=cfg.get("llm", "api_key")
 BASE_URL=cfg.get("llm", "api_base")
 MODEL=cfg.get("llm", "model")
@@ -67,37 +70,59 @@ class LLMManager(QObject):
         if not template:
             logger.warning(f"未找到对应模板: {tab_name} - {action}")
             return
-        Thread(target=self._chat_llm, args=(tab_name, template)).start()
 
-    def _chat_llm(self, tab_name, template):
+        def runner():
+            try:
+                asyncio.run(self._chat_llm(tab_name, template))
+            except Exception as e:
+                logger.exception(f"异步任务执行失败: {e}")
+
+        Thread(target=runner, daemon=True).start()
+
+    async def _chat_llm(self, tab_name, template):
         if not BASE_URL or not  MODEL:
             logger.warning("LLM 配置不完整, 请检查设置")
             self.stream_signal.emit(tab_name, "未配置LLM, 请前往设置界面配置后重启应用")
             self.stream_signal.emit(tab_name, "<<END>>")
             return
         self.running = True
-        client = OpenAI(
-            api_key=API_KEY,
-            base_url=BASE_URL
-        )
 
         try:
             print(API_KEY,BASE_URL,MODEL,self.dialogue_text_lst)
-            stream = client.chat.completions.create(
-                model=MODEL,
-                messages=[{
+            headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json" }
+            payload = {
+                "model": MODEL,
+                "messages": [{
                     "role": "user",
                     "content": template.format(dialogue="\n".join(self.dialogue_text_lst))
                 }],
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-                stream=True
-            )
+                "stream": True
+            }
 
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    self.stream_signal.emit(tab_name, chunk.choices[0].delta.content)
-                    print(chunk.choices[0].delta.content)
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream("POST", BASE_URL, headers=headers, json=payload) as response:
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        if line.startswith("data: "):
+                            data = line[len("data: "):].strip()
+                            if data == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data)
+                                delta = chunk["choices"][0]["delta"].get("content", "")
+                                if delta:
+                                   
+                                    self.stream_signal.emit(tab_name, delta)
+                            except Exception as e:
+                                logger.error(str(traceback.format_exc()))
+                                logger.error(f"[error] {e} line={data}", flush=True)
+            
         except Exception as e:
+            
+            logger.error(str(traceback.format_exc()))
             logger.exception(f"LLM 调用失败: {e}")
         finally:
             self.stream_signal.emit(tab_name, "<<END>>")

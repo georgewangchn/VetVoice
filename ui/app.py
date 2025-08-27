@@ -100,7 +100,7 @@ class VoiceApp(QWidget):
 
         # 设置菜单
         settings_menu = menu_bar.addMenu("设置")
-        action_settings = settings_menu.addAction("参数设置")
+        action_settings = settings_menu.addAction("参数")
         action_settings.triggered.connect(self.open_settings_dialog)
 
         # 关于菜单
