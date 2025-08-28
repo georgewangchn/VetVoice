@@ -1,11 +1,20 @@
-import duckdb
+import sqlite3
 import os
 from settings import cfg
-save_dir = cfg.get("app","save_dir")
+
+save_dir = cfg.get("app", "save_dir")
 DB_PATH = os.path.join(save_dir, "case.db")
 
+
+def get_conn():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row  # 查询结果支持 dict 访问
+    conn.execute("PRAGMA journal_mode=WAL;")  # 支持多进程并发
+    return conn
+
+
 def init_db():
-    conn = duckdb.connect(DB_PATH)
+    conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS cases (
             case_id TEXT PRIMARY KEY,
@@ -20,49 +29,62 @@ def init_db():
             complaint TEXT,
             diagnosis TEXT,
             dialogue TEXT,
-            created_at TIMESTAMP DEFAULT current_timestamp
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    conn.commit()
     conn.close()
 
+
 def insert_case(data: dict):
-    conn = duckdb.connect(DB_PATH)
+    conn = get_conn()
     conn.execute("""
         INSERT OR REPLACE INTO cases (
             case_id, name, phone, pet_name, species, breed, weight,
-            deworming, sterilization, complaint, diagnosis,dialogue
+            deworming, sterilization, complaint, diagnosis, dialogue
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data['case_id'], data['name'], data['phone'], data['pet_name'],
         data['species'], data['breed'], data['weight'],
         data['deworming'], data['sterilization'],
-        data['complaint'], data['diagnosis'],data['dialogue']
+        data['complaint'], data['diagnosis'], data['dialogue']
     ))
+    conn.commit()
     conn.close()
 
+
 def get_cases_today():
-    conn = duckdb.connect(DB_PATH)
+    conn = get_conn()
     results = conn.execute("""
         SELECT case_id FROM cases
-        WHERE date_trunc('day', created_at) = date_trunc('day', now())
+        WHERE DATE(created_at) = DATE('now')
         ORDER BY created_at DESC
     """).fetchall()
     conn.close()
-    return [row[0] for row in results]
+    return [row["case_id"] for row in results]
+
 
 def get_case_by_id(case_id):
-    conn = duckdb.connect(DB_PATH)
-    result = conn.execute("SELECT * FROM cases WHERE case_id = ?", (case_id,)).fetchone()
+    conn = get_conn()
+    result = conn.execute(
+        "SELECT * FROM cases WHERE case_id = ?", (case_id,)
+    ).fetchone()
     conn.close()
-    return result
+    return dict(result) if result else None
+
+
 def delete_case(case_id: str):
-    conn = duckdb.connect(DB_PATH)
+    conn = get_conn()
     conn.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
+    conn.commit()
     conn.close()
+
+
 def get_cases_by_date(date_str: str):
     # 假设 case_id 的格式是 "YYYYMMDD_N"
-    conn = duckdb.connect(DB_PATH)
+    conn = get_conn()
     sql = "SELECT case_id FROM cases WHERE case_id LIKE ? ORDER BY created_at DESC"
     pattern = f"{date_str}%"
     rows = conn.execute(sql, (pattern,)).fetchall()
-    return [r[0] for r in rows]
+    conn.close()
+    return [r["case_id"] for r in rows]

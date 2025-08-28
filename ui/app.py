@@ -74,8 +74,8 @@ class VoiceApp(QWidget):
         self.bt_panel.mic_stop.clicked.connect(self.stop_recording)
         self.bt_panel.save_pdf.clicked.connect(self.save2pdf)
         self.bt_panel.save_case.clicked.connect(self.form_panel.save)
-        self.asr_panel.input_device.currentIndexChanged.connect(lambda: cfg.set_save("input_device", "index", self.asr_panel.input_device.currentData()))
-        self.asr_panel.output_device.currentIndexChanged.connect(lambda: cfg.set_save("output_device", "index", self.asr_panel.output_device.currentData()))
+        self.asr_panel.input_device.currentIndexChanged.connect(lambda: cfg.save("input_device", "index", self.asr_panel.input_device.currentData()))
+        self.asr_panel.output_device.currentIndexChanged.connect(lambda: cfg.save("output_device", "index", self.asr_panel.output_device.currentData()))
         self.form_panel.new_case.clicked.connect(self.case_input)
         
         

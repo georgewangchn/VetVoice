@@ -144,6 +144,5 @@ class SettingsDialog(QDialog):
 
         cfg.set("process", "audio_queue_size", self.audio_queue_spin.value())
         cfg.set("process", "text_queue_size", self.text_queue_spin.value())
-        cfg.save()
 
         super().accept()
