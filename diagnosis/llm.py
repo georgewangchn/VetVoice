@@ -4,9 +4,9 @@ from openai import OpenAI
 from settings import cfg
 from loguru import logger
 from diagnosis.template import *
-API_KEY=cfg.get("llm", "api_key"),
-BASE_URL=cfg.get("llm", "api_base")
-MODEL=cfg.get("llm", "model"),
+API_KEY=cfg.get("llm", "api_key").strip()
+BASE_URL=cfg.get("llm", "api_base").strip()
+MODEL=cfg.get("llm", "model").strip()
 TEMPLATE_MAP = {
     "🩺 辅诊": {
         "生成": DIAGNOSE_TEMPLATE,
@@ -80,6 +80,7 @@ class LLMManager(QObject):
             api_key=API_KEY,
             base_url=BASE_URL
         )
+        print(API_KEY,BASE_URL,MODEL,self.dialogue_text_lst)
 
         try:
             stream = client.chat.completions.create(
@@ -88,7 +89,7 @@ class LLMManager(QObject):
                     "role": "user",
                     "content": template.format(dialogue="\n".join(self.dialogue_text_lst))
                 }],
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                # extra_body={"chat_template_kwargs": {"enable_thinking": False}},
                 stream=True
             )
 
@@ -96,6 +97,8 @@ class LLMManager(QObject):
                 if chunk.choices and chunk.choices[0].delta.content:
                     self.stream_signal.emit(tab_name, chunk.choices[0].delta.content)
         except Exception as e:
+            import traceback
+            print(traceback.format_exc())
             logger.exception(f"LLM 调用失败: {e}")
         finally:
             self.stream_signal.emit(tab_name, "<<END>>")

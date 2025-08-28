@@ -60,8 +60,8 @@ if __name__ == "__main__":
     if resource_dir and save_dir:
         # 资源路径已经在登录时设置到环境变量中
         logger.info(f"使用资源路径: {resource_dir}\n使用保存路径: {save_dir}")
-        cfg.set_save("app", "save_dir", save_dir)  # 将参数写入配置（假设cfg支持动态更新）
-        cfg.set_save("app", "resource_dir", resource_dir)  # 将参数写入配置（假设cfg支持动态更新）
+        cfg.set("app", "save_dir", save_dir)  # 将参数写入配置（假设cfg支持动态更新）
+        cfg.set("app", "resource_dir", resource_dir)  # 将参数写入配置（假设cfg支持动态更新）
         os.makedirs(os.path.join(save_dir,'wav'), exist_ok=True)
         os.makedirs(os.path.join(save_dir,'pdf'), exist_ok=True)
     else:
