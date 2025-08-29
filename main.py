@@ -1,6 +1,5 @@
 import sys
 import os
-import threading
 import time
 from multiprocessing import Process, Queue, Event, set_start_method, RawArray, Pipe, freeze_support
 from PySide6.QtWidgets import QApplication
