@@ -156,6 +156,7 @@ class FormPanel(QWidget):
         # if index < 0:
         #     return
         self.clear()  # 清空当前输入
+        self.llm.clear()
         case_id = self.case_selector.itemText(index)
         record = db.case_db.get_case_by_id(case_id)
         if not record:
@@ -206,15 +207,6 @@ class FormPanel(QWidget):
         self.clear()
         self.llm.clear()  # 清空 LLM 对话内容
     def new(self):
-        if not self.is_case_empty():
-            if not self.is_case_empty():
-                QMessageBox.warning(
-                    self,
-                    "请先删除当前病例",
-                    "当前病例表单非空，请先点击🗑️删除按钮后再新增病例。",
-                    QMessageBox.Ok
-                )
-                return
         self.clear()
         self.llm.clear()
         current_date = datetime.datetime.now().strftime("%Y%m%d")
