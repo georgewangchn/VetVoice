@@ -9,12 +9,9 @@ import tempfile
 from loguru import logger
 from settings import cfg
 from utils.resource_path import get_resource_path
-SAVE_DIR = cfg.get("app", "save_dir")
 class SpeakerReIDManager:
     def __init__(self, threshold=0.5, max_speakers=30):
-        # 使用动态资源路径
-        
-        model_path = str(get_resource_path(cfg.get("spk", "model_embedding_path")))
+        model_path = str(get_resource_path(cfg.get("spk", "model_pyannote_path")))
         
         model = Model.from_pretrained(checkpoint=os.path.join(model_path, "pytorch_model.bin")
                               , map_location="cpu",
@@ -26,9 +23,9 @@ class SpeakerReIDManager:
         self.embeddings = np.empty((0, 512))   # 假设embedding维度192，根据模型修改
         self.speaker_ids = []
         self.freqs = {}  # 频次统计 dict {speaker_id: count}
-        self.mapping_file = os.path.join(SAVE_DIR, "mapping.json")
-        self.embedding_file = os.path.join(SAVE_DIR, "embeddings.npy")
-        self.freq_file = os.path.join(SAVE_DIR, "freqs.json")
+        self.mapping_file = os.path.join(cfg.get("app", "save_dir"), "mapping.json")
+        self.embedding_file = os.path.join(cfg.get("app", "save_dir"), "embeddings.npy")
+        self.freq_file = os.path.join(cfg.get("app", "save_dir"), "freqs.json")
         self.load_cache()
         self.last_speaker='unknown'  # 添加 last_speaker 记录
         self.sample_rate = 16000

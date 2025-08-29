@@ -58,6 +58,10 @@ class LLMPanel(QWidget):
         self.setLayout(layout)
 
     def print_stream(self, tab_name, text_piece):
+        if text_piece == "<<START>>":
+            logger.info("LLM 推理开始...")
+            self.tabs[tab_name].clear()
+            text_piece=""
         if text_piece == "<<END>>":
             logger.info("LLM 推理结束")
             return

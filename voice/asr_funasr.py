@@ -21,7 +21,7 @@ class StreamVadAsr:
         self.frame_len = 160  # 10ms 对应的采样点数 (16kHz)
         self.max_segment_len = sample_rate * 15
         # ASR 模型 - 使用动态资源路径
-        model_path = str(get_resource_path(cfg.get("asr", "model_speech_path")))
+        model_path = str(get_resource_path(cfg.get("asr", "model_funasr_path")))
         self.asr_model = AutoModel(model=model_path, model_revision="v2.0.4", disable_update=True) 
         logger.info(f"[ASR] ASR模型已加载: {model_path}")
         self.chunk_size = [0, 64, 32]

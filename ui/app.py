@@ -20,7 +20,7 @@ import sounddevice as sd
 from PySide6.QtCore import Signal, Slot
 import diagnosis.llm
 import db.case_db
-import utils.common
+import json
 import ui.components.llm_panel
 import ui.components.asr_panel
 import ui.components.form_pane
@@ -40,7 +40,6 @@ class VoiceApp(QWidget):
         self.text_queue = kwargs['text_queue']
         self.audio_receive= kwargs['audio_receive']
         self.current_case_id = kwargs['current_case_id']
-        self.user_info=  kwargs['user_info']
         self.llm = diagnosis.llm.LLMManager()
         #ui
         self.setup_ui()
@@ -74,13 +73,15 @@ class VoiceApp(QWidget):
         self.bt_panel.mic_stop.clicked.connect(self.stop_recording)
         self.bt_panel.save_pdf.clicked.connect(self.save2pdf)
         self.bt_panel.save_case.clicked.connect(self.form_panel.save)
-        self.asr_panel.input_device.currentIndexChanged.connect(lambda: cfg.save("input_device", "index", self.asr_panel.input_device.currentData()))
-        self.asr_panel.output_device.currentIndexChanged.connect(lambda: cfg.save("output_device", "index", self.asr_panel.output_device.currentData()))
+        self.asr_panel.input_device.currentIndexChanged.connect(lambda: cfg.set("input_device", "index", self.asr_panel.input_device.currentData()))
+        self.asr_panel.output_device.currentIndexChanged.connect(lambda: cfg.set("output_device", "index", self.asr_panel.output_device.currentData()))
         self.form_panel.new_case.clicked.connect(self.case_input)
         
         
         # 添加右上角用户信息与退出按钮
-        self.user_label = QLabel(f"👤 {self.user_info.get('name', '')}", self)
+        user_name = cfg.get("history", "now_login")
+        name = json.loads(cfg.get("users", user_name))["name"] if user_name else "未知用户"
+        self.user_label = QLabel(f"👤 {name}", self)
         self.logout_btn = QPushButton("退出登录", self)
         self.logout_btn.setFixedHeight(24)
         self.logout_btn.setStyleSheet("QPushButton { padding: 2px 6px; }")
@@ -97,6 +98,7 @@ class VoiceApp(QWidget):
         
         #菜单
         menu_bar = QMenuBar(self)
+        # menu_bar.setNativeMenuBar(False)
 
         # 设置菜单
         settings_menu = menu_bar.addMenu("设置")

@@ -11,6 +11,7 @@ from ui.app import VoiceApp
 from settings import cfg
 from loguru import logger
 from ui.login_dialog import LoginDialog
+from PySide6.QtWidgets import QDialog
 logger.remove()
 logger.add(sys.stderr, level="DEBUG")
 def start_process(name, target, kwargs):
@@ -19,7 +20,6 @@ def start_process(name, target, kwargs):
     p.start()
     logger.info(f"启动子进程: {name} (pid={p.pid})")
     return p
-
 
 def monitor_and_restart(procs_dict, kwargs):
     while True:
@@ -48,25 +48,23 @@ if __name__ == "__main__":
     set_start_method("spawn")
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon("app.ico"))
+    from pathlib import Path
+    home = os.environ.get("VETVOICE_PATH", Path.home())
+    vetvoice_folder = os.path.join(home, ".vetvoice")
+    os.makedirs(vetvoice_folder, exist_ok=True)
+    DB_PATH = os.path.join(vetvoice_folder, "config.db")
+    if not os.path.exists(cfg.get("app", "save_dir")):
+        from ui.path_dialog import PathDialog
+        path_dialog = PathDialog()
+        if path_dialog.exec() != QDialog.Accepted:
+            sys.exit(0)
     # 显示登录对话框
     login_dialog = LoginDialog()
-    from PySide6.QtWidgets import QDialog
+    
     if login_dialog.exec() != QDialog.Accepted:
         sys.exit(0)
     
-    # 获取用户选择的资源路径
-    resource_dir ,save_dir = login_dialog.get_path()
-    if resource_dir and save_dir:
-        # 资源路径已经在登录时设置到环境变量中
-        logger.info(f"使用资源路径: {resource_dir}\n使用保存路径: {save_dir}")
-        cfg.set("app", "save_dir", save_dir)  # 将参数写入配置（假设cfg支持动态更新）
-        cfg.set("app", "resource_dir", resource_dir)  # 将参数写入配置（假设cfg支持动态更新）
-        os.makedirs(os.path.join(save_dir,'wav'), exist_ok=True)
-        os.makedirs(os.path.join(save_dir,'pdf'), exist_ok=True)
-    else:
-        QMessageBox.warning("错误", "资源路径/保存路径未设置，使用默认路径")
-        logger.warning("未设置资源路径，使用默认路径")
-        sys.exit(0)
+    # 初始化多进程通信组件
 
     audio_queue = Queue(maxsize=cfg.get("process", "audio_queue_size"))
     text_queue = Queue(maxsize=cfg.get("process", "text_queue_size"))
@@ -76,7 +74,6 @@ if __name__ == "__main__":
     start_event.clear()
     stop_event.clear()
     audio_send, audio_receive = Pipe()
-    user_info = login_dialog.get_user_info()
     kwargs = {
         'start_event': start_event,
         'stop_event': stop_event,
@@ -84,8 +81,7 @@ if __name__ == "__main__":
         'text_queue': text_queue,
         'current_case_id': current_case_id,
         'audio_send': audio_send,
-        'audio_receive': audio_receive,
-        'user_info': user_info 
+        'audio_receive': audio_receive
     }
 
     procs = {}

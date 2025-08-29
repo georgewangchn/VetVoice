@@ -41,11 +41,11 @@ def get_libopus_path(base_dir="libs/webrtc_apm") -> str:
         raise RuntimeError(f"不支持的CPU架构: {machine}")
 
     # 拼接路径
-    lib_name = "libopus" + ext if system != "windows" else "opus.dll"
+    lib_name = "libwebrtc_apm" + ext if system != "windows" else "opus.dll"
     full_path = os.path.join(base_dir, os_dir, arch, lib_name)
 
-    if not os.path.exists(full_path):
-        raise FileNotFoundError(f"未找到对应平台和架构的库文件: {full_path}")
+    # if not os.path.exists(full_path):
+    #     raise FileNotFoundError(f"未找到对应平台和架构的库文件: {full_path}")
 
     return full_path
 

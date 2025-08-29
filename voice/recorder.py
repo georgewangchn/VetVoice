@@ -11,7 +11,6 @@ from multiprocessing import Queue
 import webrtcvad
 import datetime
 from settings import cfg
-SAVE_DIR = cfg.get("app", "save_dir")
 from utils.resource_path import get_webrtc_apm_lib
 class VoiceRecorder:
     def __init__(self, audio_queue: Queue, audio_send,current_case_id):
@@ -125,7 +124,7 @@ class VoiceRecorder:
             now_str = datetime.datetime.now().strftime("%H%M%S")
             
             import os
-            filepath = os.path.join(SAVE_DIR, f"wav/{case_id}_{now_str}.wav")
+            filepath = os.path.join(cfg.get("app", "save_dir"), f"wav/{case_id}_{now_str}.wav")
             with wave.open(filepath, 'wb') as wf:
                 wf.setnchannels(1)
                 wf.setsampwidth(np.dtype('int16').itemsize)

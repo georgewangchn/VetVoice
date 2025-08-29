@@ -6,9 +6,7 @@ import httpx
 import asyncio
 import json
 from diagnosis.template import *
-API_KEY=cfg.get("llm", "api_key").strip()
-BASE_URL=cfg.get("llm", "api_base").strip()
-MODEL=cfg.get("llm", "model").strip()
+
 TEMPLATE_MAP = {
     "🩺 辅诊": {
         "生成": DIAGNOSE_TEMPLATE,
@@ -69,61 +67,65 @@ class LLMManager(QObject):
         if not template:
             logger.warning(f"未找到对应模板: {tab_name} - {action}")
             return
-
-        def runner():
-            try:
-                asyncio.run(self._chat_llm(tab_name, template))
-            except Exception as e:
-                logger.exception(f"异步任务执行失败: {e}")
-
-        Thread(target=runner, daemon=True).start()
-
-    async def _chat_llm(self, tab_name, template):
-        if not BASE_URL or not  MODEL:
-            logger.warning("LLM 配置不完整, 请检查设置")
-            self.stream_signal.emit(tab_name, "未配置LLM, 请前往设置界面配置后重启应用")
-            self.stream_signal.emit(tab_name, "<<END>>")
-            return
-        self.running = True
-        client = OpenAI(
-            api_key=API_KEY,
-            base_url=BASE_URL
-        )
-        print(API_KEY,BASE_URL,MODEL,self.dialogue_text_lst)
-
+        
         try:
+            API_KEY=cfg.get("llm", "api_key").strip()
+            BASE_URL=cfg.get("llm", "api_base").strip()
+            BASE_URL =f'{BASE_URL}/chat/completions' if "chat/completions" not in BASE_URL else BASE_URL
+            MODEL=cfg.get("llm", "model").strip()
             print(API_KEY,BASE_URL,MODEL,self.dialogue_text_lst)
-            headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json" }
-            payload = {
-                "model": MODEL,
-                "messages": [{
-                    "role": "user",
-                    "content": template.format(dialogue="\n".join(self.dialogue_text_lst))
-                }],
-                # extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-                "stream":True
-            }
+            if not BASE_URL or not  MODEL or not  self.dialogue_text_lst:
+                logger.warning("未配置LLM or 无对话内容")
+                self.stream_signal.emit(tab_name, "未配置LLM or 无对话内容")
+                self.stream_signal.emit(tab_name, "<<END>>")
+                return                
+            ###
+            import requests
+            
+            ###
+            self.running = True
+            self.stream_signal.emit(tab_name, "<<START>>")
+    
 
-            async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream("POST", BASE_URL, headers=headers, json=payload) as response:
-                    async for line in response.aiter_lines():
-                        if not line:
-                            continue
-                        if line.startswith("data: "):
-                            data = line[len("data: "):].strip()
-                            if data == "[DONE]":
-                                break
-                            try:
-                                chunk = json.loads(data)
-                                delta = chunk["choices"][0]["delta"].get("content", "")
-                                if delta:
-                                   
-                                    self.stream_signal.emit(tab_name, delta)
-                            except Exception as e:
-                                logger.error(str(traceback.format_exc()))
-                                logger.error(f"[error] {e} line={data}", flush=True)
+            response = requests.post(
+                BASE_URL,
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"},
+                json={
+                    "model": MODEL,
+                    "messages": [{
+                        "role": "user",
+                        "content": template.format(dialogue="\n".join(self.dialogue_text_lst))
+                    }],
+                    "max_tokens": 2048,
+                    "stream": True,
+                    "extra_body":{"chat_template_kwargs": {"enable_thinking": False}},
+
+                },
+                stream=True  # ✅ 关键
+            )
+
+            if response.status_code != 200:
+                logger.error(f"LLM 请求失败: {response.status_code} {response.text}")
+                return
+
+            for line in response.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                if line.startswith("data: "):
+                    data = line[len("data: "):].strip()
+                else:
+                    data = line.strip()
+
+                if data == "[DONE]":
+                    break
+
+                try:
+                    chunk = json.loads(data)
+                    delta = chunk["choices"][0]["delta"].get("content", "")
+                    if delta:
+                        self.stream_signal.emit(tab_name, delta)
+                except Exception as e:
+                    logger.error(f"解析失败 line={data} err={e}")
             
         except Exception as e:
             import traceback
