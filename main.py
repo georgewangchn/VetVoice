@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon  # 加在顶部
 from PySide6.QtWidgets import QMessageBox
 import voice.recorder as recorder
-import voice.asr_funasr as asr
+import voice.asr as asr
 from ui.app import VoiceApp
 from settings import cfg
 from loguru import logger
