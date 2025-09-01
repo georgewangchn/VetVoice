@@ -117,9 +117,13 @@ class StreamVadAsr:
         logger.info("StreamVadAsr 所有线程已启动")
 
 def run(kwargs):
+    from utils.loger_util import init_subprocess_logger
+    import os
+    init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"asr")
     """多进程录音主入口，可被循环控制"""
     audio_queue: Queue = kwargs['audio_queue']
     text_queue: Queue = kwargs['text_queue']
+    
 
     StreamVadAsr(audio_queue,text_queue).start()
 

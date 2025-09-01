@@ -169,6 +169,9 @@ class VoiceRecorder:
 
 def run(kwargs):
     """多进程录音主入口，可被循环控制"""
+    from utils.loger_util import init_subprocess_logger
+    import os
+    init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"recorder")
     start_event = kwargs['start_event']
     stop_event = kwargs['stop_event']
     audio_queue: Queue = kwargs['audio_queue']

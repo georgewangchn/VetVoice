@@ -61,27 +61,10 @@ if __name__ == "__main__":
             sys.exit(0)
     
     # log
-    save_dir = Path(cfg.get("app", "save_dir"))
-    log_dir = save_dir / "log"
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    # 日志文件名按日期命名
-    import datetime
-    log_file = log_dir / f"log_{datetime.datetime.now():%Y%m%d}.txt"
-    # 移除默认 logger
-    logger.remove()
-    # 输出到屏幕
-    logger.add(sys.stderr, level="DEBUG", colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <level>{message}</level>")
-
-    # 输出到文件，保留 5 天
-    logger.add(
-        str(log_file),
-        rotation="1 day",    # 每天生成一个新文件
-        retention="5 days",  # 保留 5 天
-        level="DEBUG",
-        encoding="utf-8",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
-    )
+    save_dir = Path()
+    from utils.loger_util import init_subprocess_logger
+    import os
+    init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"main")
     
     # 初始化数据库
     init_db()

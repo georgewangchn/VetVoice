@@ -91,7 +91,7 @@ class VoiceApp(QWidget):
 
         # 设置菜单
         settings_menu = menu_bar.addMenu("设置")
-        action_settings = settings_menu.addAction("参数")
+        action_settings = settings_menu.addAction("全局")
         action_settings.triggered.connect(self.open_settings_dialog)
 
         # 关于菜单
@@ -218,7 +218,10 @@ class VoiceApp(QWidget):
         QMessageBox.information(
             self,
             "关于 VetVoice",
-            "VetVoice 兽医声动\n智能语音电子病历系统\n版本 1.0.0"
+            "VetVoice 兽医声动\n智能语音电子病历系统\n版本 1.0.0",
+            "https://github.com/georgewangchn/VetVoice",
+            "联系方式 aigeorge@qq.com"
+            
         )
                 
 if __name__ == "__main__":
