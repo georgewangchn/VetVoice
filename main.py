@@ -5,7 +5,7 @@ from multiprocessing import Process, Queue, Event, set_start_method, RawArray, P
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon  
 import voice.recorder as recorder
-import voice.asr_funasr as asr
+import voice.asr as asr
 from ui.app import VoiceApp
 from settings import cfg
 from loguru import logger

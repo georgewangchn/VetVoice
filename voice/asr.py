@@ -3,6 +3,8 @@ import queue
 from threading import Thread
 from loguru import logger
 from funasr import AutoModel
+import vosk
+
 from multiprocessing import Queue
 import soundfile
 from voice.speaker import SpeakerReIDManager
@@ -20,9 +22,10 @@ class StreamVadAsr:
         self.frame_len = 160  # 10ms 对应的采样点数 (16kHz)
         self.max_segment_len = sample_rate * 15
         # ASR 模型 - 使用动态资源路径
-        model_path = str(get_resource_path(cfg.get("asr", "model_funasr_path")))
-        self.asr_model = AutoModel(model=model_path, model_revision="v2.0.4", disable_update=True) 
-        logger.info(f"[ASR] ASR模型已加载: {model_path}")
+        self.asr_model=cfg.get("asr","model")
+
+        model_path = str(get_resource_path(cfg.get("asr", f"model_{self.asr_model}_path")))
+        self.asr_recognizer = AutoModel(model=model_path, model_revision="v2.0.4", disable_update=True) if self.asr_model == "funasr" else vosk.KaldiRecognizer(vosk.Model(model_path) , 16000)
         self.chunk_size = [0, 64, 32]
         self.encoder_chunk_look_back = 4
         self.decoder_chunk_look_back = 1
@@ -33,7 +36,39 @@ class StreamVadAsr:
         self.reid.last_speaker = "unknown"  # 添加 last_speaker 记录
         logger.info("[ReID] 说话人识别模块已初始化")
 
+    def _funasr(self,segment):
+        res = self.asr_recognizer.generate(
+                input=segment,
+                cache=self.cache,
+                is_final=True,
+                chunk_size=self.chunk_size,
+                encoder_chunk_look_back=self.encoder_chunk_look_back,
+                decoder_chunk_look_back=self.decoder_chunk_look_back
+            )
 
+        if res:
+            if isinstance(res, list) and 'text' in res[0]:
+                return res[0]['text'].strip()
+            elif isinstance(res, dict) and 'text' in res:
+                return res['text'].strip()
+        self.cache.clear()
+        return None
+    def _vosk(self,segment):
+        byte_data = np.array(segment, dtype=np.int16).tobytes()
+        if self.asr_recognizer.AcceptWaveform(byte_data):
+                result = json.loads(self.asr_recognizer.Result())
+                text = result.get("text", "").strip()
+                if text:
+                    logger.info(f"VOSK识别结果: {text}")
+                    return text
+        else:
+                partial = json.loads(self.asr_recognizer.PartialResult())
+
+                logger.debug(f"实时识别: {partial.get('partial', '')}")
+
+            
+        
+        return None
     def asr(self):
         logger.info("ASR识别线程启动...")
         MIN_EMBED_SAMPLES = int(1 * self.sample_rate)
@@ -51,31 +86,23 @@ class StreamVadAsr:
                 logger.error(f"{str(traceback.format_exc())}")
                 continue
             logger.debug(f"[ASR] 获取音频段，长度: {len(segment)} samples,开始识别：")
-            res = self.asr_model.generate(
-                input=segment,
-                cache=self.cache,
-                is_final=True,
-                chunk_size=self.chunk_size,
-                encoder_chunk_look_back=self.encoder_chunk_look_back,
-                decoder_chunk_look_back=self.decoder_chunk_look_back
-            )
-
-            if res and isinstance(res, list) and 'text' in res[0]:
-                    text = res[0]['text'].strip()
-                    if not utils.common.is_meaningful(text):
+            text=self._funasr(segment) if self.asr_model=='funasr' else self._vosk(segment)
+            
+          
+            if not text or not utils.common.is_meaningful(text):
                         logger.debug(f"[ASR] 丢弃无效内容: {text}")
                         continue
                     # 用整段音频做说话人识别
-                    if len(segment) < MIN_EMBED_SAMPLES:
+            if len(segment) < MIN_EMBED_SAMPLES:
                         speaker_tag = self.reid.last_speaker
                         logger.warning(f"[ReID] 段落过短({len(segment)} samples)，复用前一个 speaker: {speaker_tag}")
-                    else:
+            else:
                         speaker_tag = self.reid.get_or_add(segment)
                         self.reid.last_speaker = speaker_tag
 
-                    logger.info(f"[ASR] speaker: {speaker_tag} text: {text}")
-                    self.text_queue.put_nowait(json.dumps({"speaker": speaker_tag, "text": text}))
-                    self.cache.clear()
+            logger.info(f"[ASR] speaker: {speaker_tag} text: {text}")
+            self.text_queue.put_nowait(json.dumps({"speaker": speaker_tag, "text": text}))
+            self.cache.clear()
 
     def save_thread(self):
         import time

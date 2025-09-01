@@ -156,9 +156,11 @@ class VoiceApp(QWidget):
     def case_selected(self, index):
         if index < 0:
             return
+        self.asr_panel.text_browser.clear()
         dialogue = self.form_panel.load(index)
         if dialogue:
             json_data = json.loads(dialogue)
+            
             for speaker, text in zip(json_data['speaker'], json_data['text']):
                 self.asr_panel.append_dialogue(speaker, text)
         self.form_panel.update_case_snapshot()

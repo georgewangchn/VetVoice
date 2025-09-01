@@ -143,7 +143,12 @@ class FormPanel(QWidget):
         return current != self.initial_case_snapshot
     def is_case_empty(self):
         snapshot = self.capture_case_snapshot()
-        is_empty= all(not value.strip() for key, value in snapshot.items() if key not in ["dialogue","species","breed","deworming","sterilization"] )
+        is_empty = all(
+    not value.strip() 
+    for key, value in snapshot.items() 
+    if key not in ["dialogue","species","breed","deworming","sterilization"]
+)
+        
         logger.info(f"当前病例是否为空: {is_empty}")
         logger.info(str([not value.strip() for key, value in snapshot.items() if key not in ["dialogue","species","breed","deworming","sterilization"]]))
         return is_empty
@@ -151,6 +156,7 @@ class FormPanel(QWidget):
         # if index < 0:
         #     return
         self.clear()  # 清空当前输入
+        self.llm.clear()
         case_id = self.case_selector.itemText(index)
         record = case.db.get_case_by_id(case_id)
         if not record:
@@ -160,19 +166,24 @@ class FormPanel(QWidget):
             weight, deworming, sterilization, complaint,
             diagnosis,dialogue, created_at
         ) = record
-        self.case_id.setText(case_id)
-        self.name_input.setText(name)
-        self.phone_input.setText(phone)
-        self.pet_name_input.setText(pet_name)
-        self.species_select.setCurrentText(species)
-        self.breed_select.setCurrentText(breed)
-        self.weight_input.setText(weight)
-        self.deworming_select.setCurrentText(deworming)
-        self.sterilization_select.setCurrentText(sterilization)
-        self.complaint_text.setPlainText(complaint)
-        self.diagnosis_text.setText(diagnosis)
+        if not record:
+            return
+
+        self.case_id.setText(record["case_id"])
+        self.name_input.setText(record["name"])
+        self.phone_input.setText(record["phone"])
+        self.pet_name_input.setText(record["pet_name"])
+        self.species_select.setCurrentText(record["species"])
+        self.breed_select.setCurrentText(record["breed"])
+        self.weight_input.setText(record["weight"])
+        self.deworming_select.setCurrentText(record["deworming"])
+        self.sterilization_select.setCurrentText(record["sterilization"])
+        self.complaint_text.setPlainText(record["complaint"])
+        self.diagnosis_text.setText(record["diagnosis"])
+        dialogue = record["dialogue"]
         self.update_current_case_id()
         return dialogue
+        
     def save(self):
         case_data = {
             "case_id": self.case_id.text(),
@@ -196,15 +207,6 @@ class FormPanel(QWidget):
         self.clear()
         self.llm.clear()  # 清空 LLM 对话内容
     def new(self):
-        if not self.is_case_empty():
-            if not self.is_case_empty():
-                QMessageBox.warning(
-                    self,
-                    "请先删除当前病例",
-                    "当前病例表单非空，请先点击🗑️删除按钮后再新增病例。",
-                    QMessageBox.Ok
-                )
-                return
         self.clear()
         self.llm.clear()
         current_date = datetime.datetime.now().strftime("%Y%m%d")

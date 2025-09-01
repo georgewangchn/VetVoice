@@ -20,7 +20,7 @@ DEFAULT_CONFIG = {
     "output_device": {},
     "asr": {
         "denoise": True,
-        "model":"funasr",
+        "model":"vosk",
         "model_funasr_path": "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
         "model_vosk_path": "vosk/vosk-model-small-cn-0.22"
     },
@@ -70,7 +70,6 @@ class ConfigManager:
             for key, value in kv.items():
                 if self.get(section, key) is None:
                     self.set(section, key, value)
-        logger.debug("默认配置检查完成")
 
     def get(self, section: str, key: str = None, default: Any = None):
         conn = self._get_conn()
