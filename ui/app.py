@@ -10,14 +10,14 @@ from PySide6.QtWidgets import (QMenuBar,QLabel, QVBoxLayout, QHBoxLayout, QPushB
 from PySide6.QtCore import QEvent
 from PySide6.QtGui import QIcon
 import case.llm
-import case.db
+import case.sql_manage
 import json
+import os
 import ui.components.llm_panel
 import ui.components.asr_panel
 import ui.components.form_pane
 import ui.components.bt_panel
 import ui.components.set_panel
-
 class VoiceApp(QWidget):
     def __init__(self,kwargs):
         super().__init__()
@@ -30,21 +30,19 @@ class VoiceApp(QWidget):
         self.audio_queue = kwargs['audio_queue']
         self.text_queue = kwargs['text_queue']
         self.audio_receive= kwargs['audio_receive']
-        self.current_case_id = kwargs['current_case_id']
-        self.llm = case.llm.LLMManager()
+        self.llm_manager = case.llm.LLMManager()
         #ui
         self.setup_ui()
-        case.db.init_db()
     def setup_ui(self):
         # ---------- 病例表单区域 ----------
-        self.form_panel = ui.components.form_pane.FormPanel(self.llm,self.current_case_id)
+        self.form_panel = ui.components.form_pane.FormPanel(self.llm_manager)
         self.form_panel.case_selector.currentIndexChanged.connect(self.case_selected)
        
         self.form_panel.case_selector.installEventFilter(self)
         # ---------- 右侧 BT + ASR + LLM 区域 ----------
         self.bt_panel= ui.components.bt_panel.BTPanel()
-        self.asr_panel=ui.components.asr_panel.ASRPanel(self.audio_receive,self.text_queue,self.llm)
-        self.llm_panel = ui.components.llm_panel.LLMPanel(self.llm,self.form_panel)
+        self.asr_panel=ui.components.asr_panel.ASRPanel(self.audio_receive,self.text_queue,self.llm_manager)
+        self.llm_panel = ui.components.llm_panel.LLMPanel(self.llm_manager,self.form_panel)
         
         asr_layout = QVBoxLayout()
         asr_layout.addWidget(self.bt_panel)        
@@ -129,7 +127,7 @@ class VoiceApp(QWidget):
     def eventFilter(self, obj, event):
         def _load_case_list():
             date_str = self.form_panel.date_edit.date().toString("yyyyMMdd")
-            cases = case.db.get_cases_by_date(date_str)
+            cases = case.sql_manage.CaseManager.get_case_by_date(date_str)
             self.form_panel.case_selector.clear()
             self.form_panel.case_selector.addItems(cases)
         if obj == self.form_panel.case_selector and event.type() == QEvent.MouseButtonPress:
@@ -207,6 +205,8 @@ class VoiceApp(QWidget):
         self.form_panel.new_case.setEnabled(True)
         self.form_panel.del_case.setEnabled(True)
     def save2pdf(self):
+        
+        os.makedirs(cfg.get("app", "save_dir"), exist_ok=False)
         now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     def _on_resize(self, event):
         self.user_label.move(self.width() - 100, 10)

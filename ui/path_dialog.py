@@ -7,9 +7,6 @@ from PySide6.QtWidgets import (
 
 from pathlib import Path
 
-
-
-
 class PathDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -23,9 +20,6 @@ class PathDialog(QDialog):
     def setup_ui(self):
         layout = QVBoxLayout()
         form = QFormLayout()
-
-    
-        
         # 添加资源路径选择
         resource_layout = QHBoxLayout()
         self.resource_input = QLineEdit()
@@ -135,6 +129,4 @@ class PathDialog(QDialog):
         from settings import cfg
         cfg.set("app", "resource_dir", self.resource_dir)
         cfg.set("app", "save_dir", self.save_dir)
-        os.makedirs(os.path.join(self.save_dir,'pdf'), exist_ok=True)
-        os.makedirs(os.path.join(self.save_dir,'wav'), exist_ok=True)
         super().accept()

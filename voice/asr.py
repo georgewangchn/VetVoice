@@ -2,18 +2,14 @@
 import queue
 from threading import Thread
 from loguru import logger
-from funasr import AutoModel
-import vosk
-
 from multiprocessing import Queue
-import soundfile
 from voice.speaker import SpeakerReIDManager
 import json
 from settings import cfg
-import utils
 from utils.resource_path import get_resource_path
-
+from utils.common import is_meaningful
 import traceback
+import numpy as np
 class StreamVadAsr:
     def __init__(self, audio_queue, text_queue, sample_rate=16000):
         self.audio_queue = audio_queue
@@ -23,8 +19,12 @@ class StreamVadAsr:
         self.max_segment_len = sample_rate * 15
         # ASR 模型 - 使用动态资源路径
         self.asr_model=cfg.get("asr","model")
-
         model_path = str(get_resource_path(cfg.get("asr", f"model_{self.asr_model}_path")))
+        if self.asr_model == "funasr":
+            from funasr import AutoModel
+        elif self.asr_model == "vosk":
+            import vosk
+            
         self.asr_recognizer = AutoModel(model=model_path, model_revision="v2.0.4", disable_update=True) if self.asr_model == "funasr" else vosk.KaldiRecognizer(vosk.Model(model_path) , 16000)
         self.chunk_size = [0, 64, 32]
         self.encoder_chunk_look_back = 4
@@ -89,7 +89,7 @@ class StreamVadAsr:
             text=self._funasr(segment) if self.asr_model=='funasr' else self._vosk(segment)
             
           
-            if not text or not utils.common.is_meaningful(text):
+            if not text or not is_meaningful(text):
                         logger.debug(f"[ASR] 丢弃无效内容: {text}")
                         continue
                     # 用整段音频做说话人识别

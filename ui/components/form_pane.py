@@ -1,19 +1,16 @@
 from PySide6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QTextEdit, QComboBox,
-    QPushButton, QGridLayout,QMessageBox
+    QPushButton, QGridLayout
 )
-import case.db
-
 from PySide6.QtWidgets import QDateEdit
 from PySide6.QtCore import QDate
 import datetime
-import utils.common
 from loguru import logger
+from case.sql_manage import CaseManager,VedisManager
 class FormPanel(QWidget):
-    def __init__(self,llm,current_case_id):
+    def __init__(self,llm):
         super().__init__()
         self.llm = llm  
-        self.current_case_id=current_case_id
         self.setup_ui()
         self.initial_case_snapshot = self.capture_case_snapshot()
        
@@ -121,7 +118,6 @@ class FormPanel(QWidget):
         self.complaint_text.clear()
         self.diagnosis_text.clear()
         self.update_case_snapshot()
-        self.update_current_case_id()
     def capture_case_snapshot(self):
                 return {
                 "name": self.name_input.text(),
@@ -158,7 +154,7 @@ class FormPanel(QWidget):
         self.clear()  # 清空当前输入
         self.llm.clear()
         case_id = self.case_selector.itemText(index)
-        record = case.db.get_case_by_id(case_id)
+        record = CaseManager.get_one("case_id = ?", (case_id,))
         if not record:
             return
         (
@@ -181,7 +177,7 @@ class FormPanel(QWidget):
         self.complaint_text.setPlainText(record["complaint"])
         self.diagnosis_text.setText(record["diagnosis"])
         dialogue = record["dialogue"]
-        self.update_current_case_id()
+        VedisManager.set("current_case_id", self.case_id.text())
         return dialogue
         
     def save(self):
@@ -199,20 +195,39 @@ class FormPanel(QWidget):
             "diagnosis": self.diagnosis_text.text(),
             "dialogue": str(self.llm)  
         }
-        case.db.insert_case(case_data)
+        CaseManager.insert(case_data)
         self.initial_case_snapshot=self.capture_case_snapshot()
     def delete(self):
-        case.db.delete_case(self.case_id.text())
-        utils.common.update_case_id_shared(self, self.current_case_id, "")
+        CaseManager.delete("case_id = ?", (self.case_id.text(),))
+        VedisManager.delete("current_case_id")
         self.clear()
+        self.case_selector.removeItem(self.case_selector.currentIndex())
         self.llm.clear()  # 清空 LLM 对话内容
     def new(self):
-        self.clear()
-        self.llm.clear()
+        if  self.case_id.text().strip() and not self.is_case_empty():
+            self.save()
+            self.case_selector.addItem(self.case_id.text().strip())
+            self.clear()
+            self.llm.clear()
+        # if not self.case_id.text().strip():
+        #    #case_id 为空，说明是第一次创建 
+        #     current_date = datetime.datetime.now().strftime("%Y%m%d")
+        #     count = len(CaseManager.get_case_by_date())
+        #     self.case_id.setText(f"{current_date}_{count+1}")
+        #     VedisManager.set("current_case_id", self.case_id.text())
+           
+        # else:
+        #     # case_id 不为空，说明是已有病例，检查是否修改
+        #     if not self.is_case_empty() :
+        #         self.save()
+        #         self.case_selector.addItem(self.case_id.text().strip())
+        #         self.clear()
+        #         self.llm.clear()
         current_date = datetime.datetime.now().strftime("%Y%m%d")
-        count = len(case.db.get_cases_today())
+        count = len(CaseManager.get_case_by_date())
         self.case_id.setText(f"{current_date}_{count+1}")
-        self.update_current_case_id()
+        VedisManager.set("current_case_id", self.case_id.text())
+            
+            
+            
  
-    def update_current_case_id(self):
-        utils.common.update_case_id_shared(self, self.current_case_id, self.case_id.text())

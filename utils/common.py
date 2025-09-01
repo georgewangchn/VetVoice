@@ -64,17 +64,6 @@ def get_dynamic_silence_limit(duration, base_limit=10, min_limit=2, max_duration
         dynamic_limit = base_limit - decay_ratio * (base_limit - min_limit)
         return max(min_limit, int(dynamic_limit))
     
-from datetime import datetime
-last_date = None
-current_date = datetime.now().strftime("%Y%m%d")
-
-def update_case_id_shared(self, current_case_id,case_id_str: str):
-    if case_id_str is None:
-        encoded = b''  # 空字节串
-    else:
-        encoded = case_id_str.encode('utf-8')[:64]
-    current_case_id[:len(encoded)] = encoded
-    current_case_id[len(encoded):] = b' ' * (64 - len(encoded))  # 补空白
     
 def is_meaningful(text: str):
     skip_words = {"嗯", "啊", "哈", "对", "是的", "好的", "okay", "噢", "唔", "嗯嗯", "啊啊", "哎"}
@@ -87,3 +76,11 @@ def is_meaningful(text: str):
     if re.fullmatch(r"[嗯啊哈对是的好的噢唔]{1,5}", clean_text):
         return False
     return True
+
+
+from loguru import logger
+import sys
+from settings import cfg
+from pathlib import Path
+import datetime
+

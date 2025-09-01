@@ -1,12 +1,9 @@
 from PySide6.QtCore import QObject, Signal
-from threading import Thread
 from settings import cfg
 from loguru import logger
-import httpx
-import asyncio
 import json
 from case.template import *
-
+import traceback
 TEMPLATE_MAP = {
     "🩺 辅诊": {
         "生成": DIAGNOSE_TEMPLATE,
@@ -128,8 +125,8 @@ class LLMManager(QObject):
                     logger.error(f"解析失败 line={data} err={e}")
             
         except Exception as e:
-            import traceback
-            print(traceback.format_exc())
+            
+            logger.error(traceback.format_exc())
             logger.exception(f"LLM 调用失败: {e}")
         finally:
             self.stream_signal.emit(tab_name, "<<END>>")

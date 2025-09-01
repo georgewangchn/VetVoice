@@ -11,8 +11,11 @@ from settings import cfg
 from loguru import logger
 from ui.login_dialog import LoginDialog
 from PySide6.QtWidgets import QDialog
+from pathlib import Path
+from case.sql_manage import init_db
 logger.remove()
 logger.add(sys.stderr, level="DEBUG")
+
 def start_process(name, target, kwargs):
     p = Process(target=target, args=(kwargs,), name=name)
     p.daemon = True
@@ -47,19 +50,48 @@ if __name__ == "__main__":
     set_start_method("spawn")
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon("app.ico"))
-    from pathlib import Path
-    home = os.environ.get("VETVOICE_PATH", Path.home())
+   
+    home =  Path.home()
     vetvoice_folder = os.path.join(home, ".vetvoice")
     os.makedirs(vetvoice_folder, exist_ok=True)
-    DB_PATH = os.path.join(vetvoice_folder, "config.db")
     if not os.path.exists(cfg.get("app", "save_dir")):
         from ui.path_dialog import PathDialog
         path_dialog = PathDialog()
         if path_dialog.exec() != QDialog.Accepted:
             sys.exit(0)
+    
+    # log
+    save_dir = Path(cfg.get("app", "save_dir"))
+    log_dir = save_dir / "log"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # 日志文件名按日期命名
+    log_file = log_dir / f"log_{datetime.datetime.now():%Y%m%d}.txt"
+
+    # 移除默认 logger
+    logger.remove()
+
+    # 输出到屏幕
+    logger.add(sys.stderr, level="DEBUG", colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <level>{message}</level>")
+
+    # 输出到文件，保留 5 天
+    logger.add(
+        str(log_file),
+        rotation="1 day",    # 每天生成一个新文件
+        retention="5 days",  # 保留 5 天
+        level="DEBUG",
+        encoding="utf-8",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
+    )
+
+    # 测试
+    logger.debug("日志系统初始化完成")
+    
+    # 初始化数据库
+    init_db()
+    
     # 显示登录对话框
     login_dialog = LoginDialog()
-    
     if login_dialog.exec() != QDialog.Accepted:
         sys.exit(0)
     
@@ -78,7 +110,6 @@ if __name__ == "__main__":
         'stop_event': stop_event,
         'audio_queue': audio_queue,
         'text_queue': text_queue,
-        'current_case_id': current_case_id,
         'audio_send': audio_send,
         'audio_receive': audio_receive
     }
@@ -87,11 +118,8 @@ if __name__ == "__main__":
     procs["ASRProcess"] = start_process("ASRProcess", asr.run, kwargs)
     procs["RecorderProcess"] = start_process("RecorderProcess", recorder.run, kwargs)
     
-    # monitor_thread = threading.Thread(target=monitor_and_restart, args=(procs, kwargs), daemon=True)
-    # monitor_thread.start()
+ 
     logger.info("所有子进程已启动，开始主应用...")
     voice_app = VoiceApp(kwargs)
-    
     voice_app.show() 
-
     sys.exit(app.exec())
