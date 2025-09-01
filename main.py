@@ -13,8 +13,8 @@ from ui.login_dialog import LoginDialog
 from PySide6.QtWidgets import QDialog
 from pathlib import Path
 from case.sql_manage import init_db
-logger.remove()
-logger.add(sys.stderr, level="DEBUG")
+import asyncio
+from qasync import QEventLoop
 
 def start_process(name, target, kwargs):
     p = Process(target=target, args=(kwargs,), name=name)
@@ -66,11 +66,10 @@ if __name__ == "__main__":
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # 日志文件名按日期命名
+    import datetime
     log_file = log_dir / f"log_{datetime.datetime.now():%Y%m%d}.txt"
-
     # 移除默认 logger
     logger.remove()
-
     # 输出到屏幕
     logger.add(sys.stderr, level="DEBUG", colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <level>{message}</level>")
 
@@ -83,9 +82,6 @@ if __name__ == "__main__":
         encoding="utf-8",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
     )
-
-    # 测试
-    logger.debug("日志系统初始化完成")
     
     # 初始化数据库
     init_db()
@@ -122,4 +118,8 @@ if __name__ == "__main__":
     logger.info("所有子进程已启动，开始主应用...")
     voice_app = VoiceApp(kwargs)
     voice_app.show() 
-    sys.exit(app.exec())
+    # sys.exit(app.exec())
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+    with loop:
+        loop.run_forever()

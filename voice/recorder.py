@@ -124,6 +124,7 @@ class VoiceRecorder:
             now_str = datetime.datetime.now().strftime("%H%M%S")
             
             import os
+            os.makedirs(os.path.join(cfg.get("app", "save_dir"), "wav"), exist_ok=True)
             filepath = os.path.join(cfg.get("app", "save_dir"), f"wav/{case_id}_{now_str}.wav")
             with wave.open(filepath, 'wb') as wf:
                 wf.setnchannels(1)
