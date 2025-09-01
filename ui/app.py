@@ -1,25 +1,16 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import os
-sys.path.append('/Users/siidt/Documents/siicode/nwt/')
 import json
-import sounddevice as sd
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
 import datetime
 from loguru import logger
 from settings import cfg
 import time
-from PySide6.QtWidgets import (QMenuBar,QLabel, QLineEdit, QTextEdit, QComboBox, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QTextBrowser, QWidget, QFrame,QMessageBox)
-from PySide6.QtCore import Qt, QTimer,QEvent
-from PySide6.QtGui import QIcon,QTextCursor
-from ui.waveview import WaveformWidget
-import sounddevice as sd
-# from qfluentwidgets import FluentWindow
-from PySide6.QtCore import Signal, Slot
-import diagnosis.llm
-import db.case_db
+from PySide6.QtWidgets import (QMenuBar,QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QWidget,QMessageBox)
+from PySide6.QtCore import QEvent
+from PySide6.QtGui import QIcon
+import case.llm
+import case.db
 import json
 import ui.components.llm_panel
 import ui.components.asr_panel
@@ -40,10 +31,10 @@ class VoiceApp(QWidget):
         self.text_queue = kwargs['text_queue']
         self.audio_receive= kwargs['audio_receive']
         self.current_case_id = kwargs['current_case_id']
-        self.llm = diagnosis.llm.LLMManager()
+        self.llm = case.llm.LLMManager()
         #ui
         self.setup_ui()
-        db.case_db.init_db()
+        case.db.init_db()
     def setup_ui(self):
         # ---------- 病例表单区域 ----------
         self.form_panel = ui.components.form_pane.FormPanel(self.llm,self.current_case_id)
@@ -138,7 +129,7 @@ class VoiceApp(QWidget):
     def eventFilter(self, obj, event):
         def _load_case_list():
             date_str = self.form_panel.date_edit.date().toString("yyyyMMdd")
-            cases = db.case_db.get_cases_by_date(date_str)
+            cases = case.db.get_cases_by_date(date_str)
             self.form_panel.case_selector.clear()
             self.form_panel.case_selector.addItems(cases)
         if obj == self.form_panel.case_selector and event.type() == QEvent.MouseButtonPress:

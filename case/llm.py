@@ -5,7 +5,7 @@ from loguru import logger
 import httpx
 import asyncio
 import json
-from diagnosis.template import *
+from case.template import *
 
 TEMPLATE_MAP = {
     "🩺 辅诊": {

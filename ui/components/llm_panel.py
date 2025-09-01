@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QTabWidget
 from loguru import logger
 from PySide6.QtGui import QTextCursor
-from diagnosis.llm import LLMManager
+from case.llm import LLMManager
 from ui.components.form_pane import FormPanel
 class LLMPanel(QWidget):
     def __init__(self, llm_manager: LLMManager,form_panel: FormPanel):

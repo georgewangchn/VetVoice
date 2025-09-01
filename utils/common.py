@@ -1,9 +1,6 @@
 import platform
-import sys
 import os
-from settings import cfg
 import re
-import os
 
 # 获取当前用户的主目录（home 目录）
 home_dir = os.path.expanduser("~")

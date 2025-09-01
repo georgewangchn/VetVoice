@@ -1,5 +1,4 @@
 # 新版 StreamVadAsr：VAD切段 + ASR识别 + ReID打标签
-import numpy as np
 import queue
 from threading import Thread
 from loguru import logger

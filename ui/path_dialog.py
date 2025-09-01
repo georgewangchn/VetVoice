@@ -1,6 +1,4 @@
 import os
-import json
-import base64
 from pathlib import Path
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QPushButton,

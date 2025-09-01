@@ -6,9 +6,9 @@ from settings import cfg
 from PySide6.QtCore import Qt, QTimer,QEvent
 from loguru import logger
 import json
-import diagnosis.llm
+import case.llm
 class ASRPanel(QWidget):
-    def __init__(self, audio_receive,text_queue,llm:diagnosis.llm.LLMManager):
+    def __init__(self, audio_receive,text_queue,llm:case.llm.LLMManager):
         super().__init__()
         self.audio_receive = audio_receive
         self.text_queue = text_queue

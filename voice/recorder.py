@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import resampy
 import sounddevice as sd
 import numpy as np
 import threading

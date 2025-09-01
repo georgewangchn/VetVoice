@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QTextEdit, QComboBox,
     QPushButton, QGridLayout,QMessageBox
 )
-import db.case_db
+import case.db
 
 from PySide6.QtWidgets import QDateEdit
 from PySide6.QtCore import QDate
@@ -152,7 +152,7 @@ class FormPanel(QWidget):
         #     return
         self.clear()  # 清空当前输入
         case_id = self.case_selector.itemText(index)
-        record = db.case_db.get_case_by_id(case_id)
+        record = case.db.get_case_by_id(case_id)
         if not record:
             return
         (
@@ -188,10 +188,10 @@ class FormPanel(QWidget):
             "diagnosis": self.diagnosis_text.text(),
             "dialogue": str(self.llm)  
         }
-        db.case_db.insert_case(case_data)
+        case.db.insert_case(case_data)
         self.initial_case_snapshot=self.capture_case_snapshot()
     def delete(self):
-        db.case_db.delete_case(self.case_id.text())
+        case.db.delete_case(self.case_id.text())
         utils.common.update_case_id_shared(self, self.current_case_id, "")
         self.clear()
         self.llm.clear()  # 清空 LLM 对话内容
@@ -208,7 +208,7 @@ class FormPanel(QWidget):
         self.clear()
         self.llm.clear()
         current_date = datetime.datetime.now().strftime("%Y%m%d")
-        count = len(db.case_db.get_cases_today())
+        count = len(case.db.get_cases_today())
         self.case_id.setText(f"{current_date}_{count+1}")
         self.update_current_case_id()
  
