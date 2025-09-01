@@ -30,7 +30,7 @@
 ## 实时语音降噪
   - 基于 Webrtc实时降噪（配合全向会议麦克风最佳）
 ## 实时语音识别
-  - 基于 FunASR，支持长语音断句和静音检测
+  - 基于 [FunASR](https://github.com/modelscope/FunASR) / [Vosk](https://github.com/alphacep/vosk-api)，支持长语音断句和静音检测
   - 自适应降噪，提升嘈杂环境下的识别准确率
 ## 实时说话人分离
   - 自动标记医生与宠主对话（不同颜色/对齐方式）

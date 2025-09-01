@@ -129,7 +129,7 @@ class SettingsDialog(QDialog):
                     "model": model,
                     "messages": [{"role": "user", "content": "你好"}],
                     "max_tokens": 5,
-                    "stream": True
+                    "stream": False
                 },
                 timeout=5
             )

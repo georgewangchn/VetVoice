@@ -4,7 +4,7 @@ import base64
 from pathlib import Path
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QPushButton,
-    QCheckBox, QMessageBox, QLabel, QHBoxLayout, QFileDialog
+    QCheckBox, QMessageBox
 )
 from PySide6.QtCore import Qt
 from pathlib import Path

@@ -1,16 +1,18 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QTabWidget
 from loguru import logger
 from PySide6.QtGui import QTextCursor
-from diagnosis.llm import LLMManager
+from case.llm import LLMManager
 from ui.components.form_pane import FormPanel
+import asyncio
+
 class LLMPanel(QWidget):
     def __init__(self, llm_manager: LLMManager,form_panel: FormPanel):
         super().__init__()
-        self.llm = llm_manager
+        self.llm_manager = llm_manager
         self.form_panel = form_panel
         self.tabs = {}  # 存储每个 tab 的 QTextEdit
         self.setup_ui()
-        self.llm.stream_signal.connect(self.print_stream)
+        self.llm_manager.stream_signal.connect(self.print_stream)
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -47,7 +49,7 @@ class LLMPanel(QWidget):
                 [generate_btn, rewrite_btn, format_btn],
                 ["生成", "修饰", "格式"]
             ):
-                btn.clicked.connect(lambda checked=False, t=action, tab_name=name: self.llm.run_task(tab_name, t))
+                btn.clicked.connect(lambda checked=False, t=action, tab_name=name: asyncio.create_task(self.llm_manager.run_task_async(tab_name, t)))
                 llm_button_bar.addWidget(btn)
             fill_btn.clicked.connect(lambda checked=False, tab_name=name: self.fill_to_record(tab_name))
             llm_button_bar.addWidget(fill_btn)
