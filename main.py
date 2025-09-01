@@ -4,7 +4,6 @@ import time
 from multiprocessing import Process, Queue, Event, set_start_method, RawArray, Pipe, freeze_support
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon  # 加在顶部
-from PySide6.QtWidgets import QMessageBox
 import voice.recorder as recorder
 import voice.asr as asr
 from ui.app import VoiceApp
