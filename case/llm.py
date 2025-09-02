@@ -4,7 +4,6 @@ from loguru import logger
 import json
 import traceback
 import httpx
-import requests
 from case.template import *
 
 TEMPLATE_MAP = {
@@ -25,16 +24,16 @@ TEMPLATE_MAP = {
 
 class LLMManager(QObject):
     stream_signal = Signal(str, str) 
+    
     def __init__(self):
         super().__init__()
         self.asr_speaker_lst = []
-        self.dialogue_speaker_lst = []
-        self.dialogue_text_lst = []
         self.dialogue_history = []
         self.running = False
 
     def clear(self):
         self.asr_speaker_lst.clear()
+        self.dialogue_history.clear()
         self.running = False
 
     def append(self, speaker, text):
@@ -42,7 +41,7 @@ class LLMManager(QObject):
 
     def __str__(self):
         import json
-        return json.dumps({self.asr_speaker_lst}, ensure_ascii=False, indent=2)
+        return json.dumps(self.asr_speaker_lst, ensure_ascii=False, indent=2)
     async def run_task_async(self, tab_name: str, action: str):
         """异步调用 LLM 接口"""
         logger.info(f"LLM 任务: tab={tab_name}, action={action}")
@@ -62,11 +61,13 @@ class LLMManager(QObject):
                 self.stream_signal.emit(tab_name, "未配置LLM，请进入【设置】【全局】【大模型】配置\n")
                 self.stream_signal.emit(tab_name, "<<END>>")
                 return
-            if not self.asr_speaker_lst or '':
+            content ='\n'.join([ tup[1]  for tup in self.asr_speaker_lst]) 
+            if not self.asr_speaker_lst or len(content)<30:
                 self.stream_signal.emit(tab_name, "<<START>>")
-                self.stream_signal.emit(tab_name, "无对话内容\n")
+                self.stream_signal.emit(tab_name, "无对话内容/<30字\n")
                 self.stream_signal.emit(tab_name, "<<END>>")
                 return
+            
 
             self.running = True
             self.stream_signal.emit(tab_name, "<<START>>")
@@ -83,7 +84,7 @@ class LLMManager(QObject):
                     json={
                         "model": MODEL,
                         "messages": [
-                            {"role": "user","content": template.format(dialogue="\n".join(self.dialogue_text_lst))}
+                            {"role": "user","content": template.format(dialogue=content)}
                             ],
                         "max_tokens": int(cfg.get("llm", "max_tokens", 2048)),
                         "temperature": float(cfg.get("llm", "temperature", 0.1)),

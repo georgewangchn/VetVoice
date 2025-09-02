@@ -159,7 +159,7 @@ class VoiceApp(QWidget):
         if dialogue:
             json_data = json.loads(dialogue)
             
-            for speaker, text in zip(json_data['speaker'], json_data['text']):
+            for speaker, text in json_data:
                 self.asr_panel.append_dialogue(speaker, text)
         self.form_panel.update_case_snapshot()
         
