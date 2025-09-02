@@ -10,6 +10,7 @@ from utils.resource_path import get_resource_path
 from utils.common import is_meaningful
 import traceback
 import numpy as np
+import traceback
 class StreamVadAsr:
     def __init__(self, audio_queue, text_queue, sample_rate=16000):
         self.audio_queue = audio_queue
@@ -85,20 +86,30 @@ class StreamVadAsr:
             except Exception as e:
                 logger.error(f"{str(traceback.format_exc())}")
                 continue
-            logger.debug(f"[ASR] 获取音频段，长度: {len(segment)} samples,开始识别：")
-            text=self._funasr(segment) if self.asr_model=='funasr' else self._vosk(segment)
+            try:
+                logger.debug(f"[ASR] 获取音频段，长度: {len(segment)} samples,开始识别：")
+                text=self._funasr(segment) if self.asr_model=='funasr' else self._vosk(segment )
+            except Exception as e:
+                logger.error(traceback.format_exc())
+                logger.error(f"[ASR] 识别失败: {e}")
+                continue
             
           
             if not text or not is_meaningful(text):
                         logger.debug(f"[ASR] 丢弃无效内容: {text}")
                         continue
                     # 用整段音频做说话人识别
-            if len(segment) < MIN_EMBED_SAMPLES:
-                        speaker_tag = self.reid.last_speaker
-                        logger.warning(f"[ReID] 段落过短({len(segment)} samples)，复用前一个 speaker: {speaker_tag}")
-            else:
-                        speaker_tag = self.reid.get_or_add(segment)
-                        self.reid.last_speaker = speaker_tag
+            try:
+                if len(segment) < MIN_EMBED_SAMPLES:
+                            speaker_tag = self.reid.last_speaker
+                            logger.warning(f"[ReID] 段落过短({len(segment)} samples)，复用前一个 speaker: {speaker_tag}")
+                else:
+                            speaker_tag = self.reid.get_or_add(segment)
+                            self.reid.last_speaker = speaker_tag
+            except Exception as e:
+                        logger.error(traceback.format_exc())
+                        logger.error(f"[ReID] 说话人识别失败: {e}")
+                        speaker_tag = "unknown"
 
             logger.info(f"[ASR] speaker: {speaker_tag} text: {text}")
             self.text_queue.put_nowait(json.dumps({"speaker": speaker_tag, "text": text}))

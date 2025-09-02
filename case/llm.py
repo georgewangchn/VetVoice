@@ -8,27 +8,18 @@ import httpx
 TEMPLATE_MAP = {
     "🩺 辅诊": {
         "生成": DIAGNOSE_TEMPLATE,
-        "修饰": DIAGNOSE_TEMPLATE_REWRITE,
         "格式": DIAGNOSE_TEMPLATE_FORMAT,
     },
-    "📋 主诉": {
+    "📋 病例": {
         "生成": COMPLAINT_TEMPLATE,
-        "修饰": COMPLAINT_TEMPLATE_REWRITE,
         "格式": COMPLAINT_TEMPLATE_FORMAT,
-    },
-    "📇 基本信息": {
-        "生成": INFO_TEMPLATE,
-        "修饰": INFO_TEMPLATE_REWRITE,
-        "格式": INFO_TEMPLATE_FORMAT,
     },
     "💊 用药": {
         "生成": MEDICATION_TEMPLATE,
-        "修饰": MEDICATION_TEMPLATE_REWRITE,
         "格式": MEDICATION_TEMPLATE_FORMAT,
     },
     "🧪 质检": {
         "生成": QUALITY_CHECK_TEMPLATE,
-        "修饰": QUALITY_CHECK_TEMPLATE_REWRITE,
         "格式": QUALITY_CHECK_TEMPLATE_FORMAT,
     },
 }
@@ -72,8 +63,14 @@ class LLMManager(QObject):
             BASE_URL = f"{BASE_URL}/chat/completions" if "chat/completions" not in BASE_URL else BASE_URL
             MODEL = cfg.get("llm", "model").strip()
 
-            if not BASE_URL or not MODEL or not self.dialogue_text_lst:
-                self.stream_signal.emit(tab_name, "未配置LLM or 无对话内容")
+            if not BASE_URL or not MODEL :
+                self.stream_signal.emit(tab_name, "<<START>>")
+                self.stream_signal.emit(tab_name, "未配置LLM，请进入【设置】【全局【大模型】配置\n")
+                self.stream_signal.emit(tab_name, "<<END>>")
+                return
+            if not self.dialogue_text_lst:
+                self.stream_signal.emit(tab_name, "<<START>>")
+                self.stream_signal.emit(tab_name, "无对话内容\n")
                 self.stream_signal.emit(tab_name, "<<END>>")
                 return
 
@@ -94,9 +91,10 @@ class LLMManager(QObject):
                             "role": "user",
                             "content": template.format(dialogue="\n".join(self.dialogue_text_lst))
                         }],
-                        "max_tokens": 2048,
+                        "max_tokens": int(cfg.get("llm", "max_tokens", 2048)),
+                        "temperature": float(cfg.get("llm", "temperature", 0.1)),
                         "stream": True,
-                        # "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
+                        "extra_body": {"chat_template_kwargs": {"enable_thinking": cfg.get("llm", "thinking",False)}},
                     }
                 ) as response:
                     response.raise_for_status() 
