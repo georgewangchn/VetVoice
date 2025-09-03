@@ -115,6 +115,8 @@ class ASRPanel(QWidget):
 
                 self.append_dialogue(speaker, text)
         except Exception as e:
+            import traceback
+            logger.error(traceback.format_exc())
             logger.warning(f"文本队列读取出错: {e}")
     def append_dialogue(self, speaker, text):
         if speaker.lower() == "unknown" or speaker.lower() == "unkonw":

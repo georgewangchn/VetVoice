@@ -90,7 +90,10 @@ class CaseManager(BaseTableManager):
             deworming TEXT,
             sterilization TEXT,
             complaint TEXT,
+            checkup TEXT,
+            results TEXT,
             diagnosis TEXT,
+            treatment TEXT,
             dialogue TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )

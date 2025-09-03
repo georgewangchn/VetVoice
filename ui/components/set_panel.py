@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QDialog, QFormLayout, QLineEdit, QSpinBox, QDialogButtonBox, QLabel,
-    QTabWidget, QWidget, QVBoxLayout, QComboBox, QCheckBox, QPushButton, QMessageBox
+    QTabWidget, QWidget, QVBoxLayout, QComboBox, QCheckBox, QPushButton, QMessageBox, QDoubleSpinBox
 )
 from settings import cfg
 import requests
@@ -30,13 +30,32 @@ class SettingsDialog(QDialog):
         self.model_edit = QLineEdit(cfg.get("llm", "model", ""))
         self.model_edit.setPlaceholderText("大模型名model: Qwen3-235B-A22B")
         self.model_edit.setMinimumWidth(250)
+        self.temperature_spinbox = QDoubleSpinBox()
+        self.temperature_spinbox.setRange(0.0, 2.0)  # 温度范围
+        self.temperature_spinbox.setDecimals(1)     # 保留1位小数
+        self.temperature_spinbox.setSingleStep(0.1)  # 步长
+        self.temperature_spinbox.setValue(float(cfg.get("llm", "temperature", 0.1)))  
+        self.temperature_spinbox.setMaximumWidth(100)
+
+        # ===== 新增：max_tokens 参数 =====
+        # 最大生成 token 数，int，常用范围例如 [100 ~ 16384]
+        self.max_tokens_spinbox = QSpinBox()
+        self.max_tokens_spinbox.setRange(100, 16384)  # 设置合理的范围
+        self.max_tokens_spinbox.setValue(int(cfg.get("llm", "max_tokens", 2048)))  # 默认1024
+        self.max_tokens_spinbox.setMaximumWidth(100)
+        
+        self.thinking_checkbox = QCheckBox("启用<think>思考模式")
+        self.thinking_checkbox.setChecked(cfg.get("llm", "think", False))
 
         self.test_btn = QPushButton("连接测试")
         self.test_btn.clicked.connect(self.test_connection)
 
-        llm_layout.addRow("LLM API Key:", self.api_key_edit)
-        llm_layout.addRow("LLM API Base:", self.api_base_edit)
-        llm_layout.addRow("LLM 模型:", self.model_edit)
+        llm_layout.addRow("API Key:", self.api_key_edit)
+        llm_layout.addRow("API Base:", self.api_base_edit)
+        llm_layout.addRow("模型名:", self.model_edit)
+        llm_layout.addRow("生成温度 (0.0-2.0):", self.temperature_spinbox)
+        llm_layout.addRow("最大生成 Tokens:", self.max_tokens_spinbox)
+        llm_layout.addRow(self.thinking_checkbox)
         llm_layout.addRow(self.test_btn)
         llm_layout.addWidget(QLabel("* 支持openai形式接口\n* 请确保大模型服务可用后再进行连接测试"))
 
@@ -147,7 +166,9 @@ class SettingsDialog(QDialog):
         cfg.set("llm", "api_key", self.api_key_edit.text())
         cfg.set("llm", "api_base", self.api_base_edit.text())
         cfg.set("llm", "model", self.model_edit.text())
-
+        cfg.set("llm", "temperature", self.temperature_spinbox.value())
+        cfg.set("llm", "max_tokens", self.max_tokens_spinbox.value())
+        cfg.set("llm", "think", self.thinking_checkbox.isChecked())
         asr_model = self.asr_model_combo.currentText()
         if asr_model != "请选择 ASR 模型":
             cfg.set("asr", "model", asr_model)

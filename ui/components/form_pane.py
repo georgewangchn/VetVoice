@@ -66,7 +66,7 @@ class FormPanel(QWidget):
         # 第4行
         self.form_layout.addWidget(QLabel("品种"), 4, 0)
         self.breed_select =QComboBox()
-        self.breed_select.addItems(["珂基", "斗牛", "其他"])
+        self.breed_select.addItems(["柯基", "斗牛", "其他"])
         self.breed_select.setCurrentIndex(-1) 
         self.form_layout.addWidget(self.breed_select, 4, 1)
 
@@ -89,17 +89,26 @@ class FormPanel(QWidget):
         # 第6行 主诉
         self.form_layout.addWidget(QLabel("主诉"), 6, 0)
         self.complaint_text = QTextEdit()
-        self.form_layout.addWidget(self.complaint_text, 7, 0, 6, 4)
-
+        self.form_layout.addWidget(self.complaint_text, 6, 1, 4, 3)
+        
+        # 第7行 检查
+        self.form_layout.addWidget(QLabel("检查"), 10, 0)
+        self.checkup_text = QTextEdit()
+        self.form_layout.addWidget(self.checkup_text, 10, 1, 2, 3)
+        # 第8行 结果
+        self.form_layout.addWidget(QLabel("检查结果"), 12, 0)
+        self.results_text = QTextEdit()
+        self.form_layout.addWidget(self.results_text, 12, 1, 2, 3)
+        
         # 第7行 诊断
-        self.form_layout.addWidget(QLabel("诊断："), 13, 0)
+        self.form_layout.addWidget(QLabel("诊断："), 14, 0)
         self.diagnosis_text = QLineEdit()
-        self.form_layout.addWidget(self.diagnosis_text, 13, 1, 1, 3)
+        self.form_layout.addWidget(self.diagnosis_text, 14, 1, 1, 3)
         
         # 第6行 治疗
-        self.form_layout.addWidget(QLabel("治疗"), 14, 0)
+        self.form_layout.addWidget(QLabel("治疗"), 15, 0)
         self.treatment_text = QTextEdit()
-        self.form_layout.addWidget(self.treatment_text, 15, 0, 6, 4)
+        self.form_layout.addWidget(self.treatment_text, 15, 1, 2, 3)
 
         self.setLayout(self.form_layout)
         
@@ -129,7 +138,10 @@ class FormPanel(QWidget):
                 "deworming": self.deworming_select.currentText(),
                 "sterilization": self.sterilization_select.currentText(),
                 "complaint": self.complaint_text.toPlainText(),
+                "checkup": self.checkup_text.toPlainText(),
+                "results": self.checkup_text.toPlainText(),
                 "diagnosis": self.diagnosis_text.text(),
+                "treatment": self.treatment_text.toPlainText(),
                 "dialogue": str(self.llm),
             }
     def update_case_snapshot(self):
@@ -157,14 +169,6 @@ class FormPanel(QWidget):
         record = CaseManager.get_one("case_id = ?", (case_id,))
         if not record:
             return
-        (
-            case_id, name, phone, pet_name, species, breed,
-            weight, deworming, sterilization, complaint,
-            diagnosis,dialogue, created_at
-        ) = record
-        if not record:
-            return
-
         self.case_id.setText(record["case_id"])
         self.name_input.setText(record["name"])
         self.phone_input.setText(record["phone"])
@@ -175,7 +179,10 @@ class FormPanel(QWidget):
         self.deworming_select.setCurrentText(record["deworming"])
         self.sterilization_select.setCurrentText(record["sterilization"])
         self.complaint_text.setPlainText(record["complaint"])
+        self.checkup_text.setPlainText(record["checkup"])
+        self.results_text.setPlainText(record["results"])
         self.diagnosis_text.setText(record["diagnosis"])
+        self.treatment_text.setPlainText(record["treatment"])
         dialogue = record["dialogue"]
         VedisManager.set("current_case_id", self.case_id.text())
         return dialogue
@@ -192,7 +199,10 @@ class FormPanel(QWidget):
             "deworming": self.deworming_select.currentText(),
             "sterilization": self.sterilization_select.currentText(),
             "complaint": self.complaint_text.toPlainText(),
+            "checkup": self.checkup_text.toPlainText(),
+            "results": self.checkup_text.toPlainText(),
             "diagnosis": self.diagnosis_text.text(),
+            "treatment": self.treatment_text.toPlainText(),
             "dialogue": str(self.llm)  
         }
         CaseManager.insert(case_data)
