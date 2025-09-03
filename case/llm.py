@@ -10,8 +10,8 @@ TEMPLATE_MAP = {
     "🩺 辅诊": {
         "生成": DIAGNOSE_TEMPLATE,
     },
-    "📋 病例": {
-        "生成": COMPLAINT_TEMPLATE,
+    "🗂️ 填充": {
+        "生成": FILL_TEMPLATE,
     },
     "💊 用药": {
         "生成": MEDICATION_TEMPLATE,
@@ -30,6 +30,7 @@ class LLMManager(QObject):
         self.asr_speaker_lst = []
         self.dialogue_history = []
         self.running = False
+        self.buffer_stream = ""
 
     def clear(self):
         self.asr_speaker_lst.clear()
@@ -42,13 +43,11 @@ class LLMManager(QObject):
     def __str__(self):
         import json
         return json.dumps(self.asr_speaker_lst, ensure_ascii=False, indent=2)
-    async def run_task_async(self, tab_name: str, action: str):
+    async def run_task_async(self, tab_name: str, action: str,case_snapshot:dict,command:str):
         """异步调用 LLM 接口"""
         logger.info(f"LLM 任务: tab={tab_name}, action={action}")
-        template = TEMPLATE_MAP.get(tab_name, {}).get(action)
-        if not template:
-            logger.warning(f"未找到对应模板: {tab_name} - {action}")
-            return
+        
+
 
         try:
             API_KEY = cfg.get("llm", "api_key").strip()
@@ -61,7 +60,7 @@ class LLMManager(QObject):
                 self.stream_signal.emit(tab_name, "未配置LLM，请进入【设置】【全局】【大模型】配置\n")
                 self.stream_signal.emit(tab_name, "<<END>>")
                 return
-            content ='\n'.join([ tup[1]  for tup in self.asr_speaker_lst]) 
+            content ='\n'.join([ str(tup)  for tup in self.asr_speaker_lst]) 
             if not self.asr_speaker_lst or len(content)<30:
                 self.stream_signal.emit(tab_name, "<<START>>")
                 self.stream_signal.emit(tab_name, "无对话内容/<30字\n")
@@ -72,7 +71,12 @@ class LLMManager(QObject):
             self.running = True
             self.stream_signal.emit(tab_name, "<<START>>")
             timeout = httpx.Timeout(60.0, read=120.0)
-
+            import copy
+            params=copy.deepcopy(case_snapshot)
+            params["dialogue"]=content
+            params["command"]=command
+            self.buffer_stream=""
+            logger.debug(str(TEMPLATE_MAP.get(tab_name, {}).get(action).format(**params)))
             async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream(
                     "POST",
@@ -84,14 +88,14 @@ class LLMManager(QObject):
                     json={
                         "model": MODEL,
                         "messages": [
-                            {"role": "user","content": template.format(dialogue=content)}
+                            {"role": "user","content": TEMPLATE_MAP.get(tab_name, {}).get(action).format(**params)}
                             ],
                         "max_tokens": int(cfg.get("llm", "max_tokens", 2048)),
                         "temperature": float(cfg.get("llm", "temperature", 0.1)),
                         "stream": True,
                         "extra_body": {
                             "chat_template_kwargs": {
-                                "enable_thinking": cfg.get("llm", "thinking", False)
+                                "enable_thinking": cfg.get("llm", "think", False)
                             }
                         },
                     }
@@ -101,7 +105,6 @@ class LLMManager(QObject):
                     if response.status_code != 200:
                         logger.error(f"LLM 请求失败: {response.status_code} {await response.aread()}")
                         return
-
                     async for line in response.aiter_lines():
                         line = line.strip()
                         if not line:
@@ -119,6 +122,7 @@ class LLMManager(QObject):
                             delta = chunk["choices"][0]["delta"].get("content", "")
                             if delta:
                                 self.stream_signal.emit(tab_name, delta)
+                                self.buffer_stream+=delta
                         except Exception as e:
                             logger.error(f"解析失败 line={data} err={e}")
 

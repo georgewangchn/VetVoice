@@ -166,7 +166,9 @@ class SettingsDialog(QDialog):
         cfg.set("llm", "api_key", self.api_key_edit.text())
         cfg.set("llm", "api_base", self.api_base_edit.text())
         cfg.set("llm", "model", self.model_edit.text())
-
+        cfg.set("llm", "temperature", self.temperature_spinbox.value())
+        cfg.set("llm", "max_tokens", self.max_tokens_spinbox.value())
+        cfg.set("llm", "think", self.thinking_checkbox.isChecked())
         asr_model = self.asr_model_combo.currentText()
         if asr_model != "请选择 ASR 模型":
             cfg.set("asr", "model", asr_model)

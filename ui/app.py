@@ -23,7 +23,7 @@ class VoiceApp(QWidget):
         super().__init__()
         self.setWindowTitle("VetVoice-兽医声动|智能语音电子病历")
         self.setWindowIcon(QIcon("app.ico"))
-        self.resize(1200, 800)
+        self.resize(1400, 900)
         #
         self.start_event = kwargs['start_event']
         self.stop_event = kwargs['stop_event']
@@ -51,8 +51,8 @@ class VoiceApp(QWidget):
 
         # ---------- 汇总主区域 ----------
         center_layout = QHBoxLayout()
-        center_layout.addWidget(self.form_panel, 2)  
-        center_layout.addLayout(asr_layout, 3)  
+        center_layout.addWidget(self.form_panel, 1)  
+        center_layout.addLayout(asr_layout, 1)  
         app_layout = QVBoxLayout()
         app_layout.addLayout(center_layout)
         self.setLayout(app_layout)
@@ -223,35 +223,3 @@ class VoiceApp(QWidget):
             "联系方式 aigeorge@qq.com"
             
         )
-                
-if __name__ == "__main__":
-    from PySide6.QtWidgets import QApplication
-
-    app = QApplication(sys.argv)
-    from PySide6.QtGui import QIcon
-    app.setWindowIcon(QIcon("app.ico"))
-    from multiprocessing import Process, Queue, Event, set_start_method, RawValue, Pipe
-
-    audio_queue = Queue(maxsize=cfg.get("process", "audio_queue_size"))
-    text_queue = Queue(maxsize=cfg.get("process", "text_queue_size"))
-    start_event = Event()
-    stop_event = Event()
-    case_index = RawValue('i', 0)
-    start_event.clear()
-    stop_event.clear()
-    audio_send, audio_receive = Pipe()
-
-    kwargs = {
-        'start_event': start_event,
-        'stop_event': stop_event,
-        'audio_queue': audio_queue,
-        'text_queue': text_queue,
-        'case_index': case_index,
-        'audio_send': audio_send,
-        'audio_receive': audio_receive
-    }
-
-
-    voice_app = VoiceApp(kwargs)
-    voice_app.show()
-    sys.exit(app.exec())
