@@ -6,13 +6,13 @@ from settings import cfg
 from PySide6.QtCore import Qt, QTimer,QEvent
 from loguru import logger
 import json
-import diagnosis.llm
+import case.llm
 class ASRPanel(QWidget):
-    def __init__(self, audio_receive,text_queue,llm:diagnosis.llm.LLMManager):
+    def __init__(self, audio_receive,text_queue,llm_manager:case.llm.LLMManager):
         super().__init__()
         self.audio_receive = audio_receive
         self.text_queue = text_queue
-        self.llm=llm
+        self.llm_manager=llm_manager
         self.setup_ui()
         self.timer = QTimer()
         self.timer.timeout.connect(self.poll_text_queue)
@@ -134,7 +134,7 @@ class ASRPanel(QWidget):
                 """
         self.text_browser.append(html)
         self.text_browser.verticalScrollBar().setValue(self.text_browser.verticalScrollBar().maximum())
-        self.llm.append(speaker,text)
+        self.llm_manager.append(speaker,text)
     def reset_waveform(self):
         self.wave_widget.reset_waveform()
 

@@ -1,19 +1,16 @@
 from PySide6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QTextEdit, QComboBox,
-    QPushButton, QGridLayout,QMessageBox
+    QPushButton, QGridLayout
 )
-import db.case_db
-
 from PySide6.QtWidgets import QDateEdit
 from PySide6.QtCore import QDate
 import datetime
-import utils.common
 from loguru import logger
+from case.sql_manage import CaseManager,VedisManager
 class FormPanel(QWidget):
-    def __init__(self,llm,current_case_id):
+    def __init__(self,llm):
         super().__init__()
         self.llm = llm  
-        self.current_case_id=current_case_id
         self.setup_ui()
         self.initial_case_snapshot = self.capture_case_snapshot()
        
@@ -121,7 +118,6 @@ class FormPanel(QWidget):
         self.complaint_text.clear()
         self.diagnosis_text.clear()
         self.update_case_snapshot()
-        self.update_current_case_id()
     def capture_case_snapshot(self):
                 return {
                 "name": self.name_input.text(),
@@ -143,7 +139,12 @@ class FormPanel(QWidget):
         return current != self.initial_case_snapshot
     def is_case_empty(self):
         snapshot = self.capture_case_snapshot()
-        is_empty= all(not value.strip() for key, value in snapshot.items() if key not in ["dialogue","species","breed","deworming","sterilization"] )
+        is_empty = all(
+    not value.strip() 
+    for key, value in snapshot.items() 
+    if key not in ["dialogue","species","breed","deworming","sterilization"]
+)
+        
         logger.info(f"当前病例是否为空: {is_empty}")
         logger.info(str([not value.strip() for key, value in snapshot.items() if key not in ["dialogue","species","breed","deworming","sterilization"]]))
         return is_empty
@@ -151,8 +152,9 @@ class FormPanel(QWidget):
         # if index < 0:
         #     return
         self.clear()  # 清空当前输入
+        self.llm.clear()
         case_id = self.case_selector.itemText(index)
-        record = db.case_db.get_case_by_id(case_id)
+        record = CaseManager.get_one("case_id = ?", (case_id,))
         if not record:
             return
         (
@@ -160,19 +162,24 @@ class FormPanel(QWidget):
             weight, deworming, sterilization, complaint,
             diagnosis,dialogue, created_at
         ) = record
-        self.case_id.setText(case_id)
-        self.name_input.setText(name)
-        self.phone_input.setText(phone)
-        self.pet_name_input.setText(pet_name)
-        self.species_select.setCurrentText(species)
-        self.breed_select.setCurrentText(breed)
-        self.weight_input.setText(weight)
-        self.deworming_select.setCurrentText(deworming)
-        self.sterilization_select.setCurrentText(sterilization)
-        self.complaint_text.setPlainText(complaint)
-        self.diagnosis_text.setText(diagnosis)
-        self.update_current_case_id()
+        if not record:
+            return
+
+        self.case_id.setText(record["case_id"])
+        self.name_input.setText(record["name"])
+        self.phone_input.setText(record["phone"])
+        self.pet_name_input.setText(record["pet_name"])
+        self.species_select.setCurrentText(record["species"])
+        self.breed_select.setCurrentText(record["breed"])
+        self.weight_input.setText(record["weight"])
+        self.deworming_select.setCurrentText(record["deworming"])
+        self.sterilization_select.setCurrentText(record["sterilization"])
+        self.complaint_text.setPlainText(record["complaint"])
+        self.diagnosis_text.setText(record["diagnosis"])
+        dialogue = record["dialogue"]
+        VedisManager.set("current_case_id", self.case_id.text())
         return dialogue
+        
     def save(self):
         case_data = {
             "case_id": self.case_id.text(),
@@ -188,29 +195,39 @@ class FormPanel(QWidget):
             "diagnosis": self.diagnosis_text.text(),
             "dialogue": str(self.llm)  
         }
-        db.case_db.insert_case(case_data)
+        CaseManager.insert(case_data)
         self.initial_case_snapshot=self.capture_case_snapshot()
     def delete(self):
-        db.case_db.delete_case(self.case_id.text())
-        utils.common.update_case_id_shared(self, self.current_case_id, "")
+        CaseManager.delete("case_id = ?", (self.case_id.text(),))
+        VedisManager.delete("current_case_id")
         self.clear()
+        self.case_selector.removeItem(self.case_selector.currentIndex())
         self.llm.clear()  # 清空 LLM 对话内容
     def new(self):
-        if not self.is_case_empty():
-            if not self.is_case_empty():
-                QMessageBox.warning(
-                    self,
-                    "请先删除当前病例",
-                    "当前病例表单非空，请先点击🗑️删除按钮后再新增病例。",
-                    QMessageBox.Ok
-                )
-                return
-        self.clear()
-        self.llm.clear()
+        if  self.case_id.text().strip() and not self.is_case_empty():
+            self.save()
+            self.case_selector.addItem(self.case_id.text().strip())
+            self.clear()
+            self.llm.clear()
+        # if not self.case_id.text().strip():
+        #    #case_id 为空，说明是第一次创建 
+        #     current_date = datetime.datetime.now().strftime("%Y%m%d")
+        #     count = len(CaseManager.get_case_by_date())
+        #     self.case_id.setText(f"{current_date}_{count+1}")
+        #     VedisManager.set("current_case_id", self.case_id.text())
+           
+        # else:
+        #     # case_id 不为空，说明是已有病例，检查是否修改
+        #     if not self.is_case_empty() :
+        #         self.save()
+        #         self.case_selector.addItem(self.case_id.text().strip())
+        #         self.clear()
+        #         self.llm.clear()
         current_date = datetime.datetime.now().strftime("%Y%m%d")
-        count = len(db.case_db.get_cases_today())
+        count = len(CaseManager.get_case_by_date())
         self.case_id.setText(f"{current_date}_{count+1}")
-        self.update_current_case_id()
+        VedisManager.set("current_case_id", self.case_id.text())
+            
+            
+            
  
-    def update_current_case_id(self):
-        utils.common.update_case_id_shared(self, self.current_case_id, self.case_id.text())

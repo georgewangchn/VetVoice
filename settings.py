@@ -19,15 +19,18 @@ DEFAULT_CONFIG = {
     "input_device": {},
     "output_device": {},
     "asr": {
-        "model_speech_path": "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
+        "denoise": True,
+        "model":"vosk",
+        "model_funasr_path": "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
         "model_vosk_path": "vosk/vosk-model-small-cn-0.22"
     },
     "process": {
         "audio_queue_size": 100,
         "text_queue_size": 100
     },
+        
     "spk": {
-        "model_embedding_path": "pyannote/embedding"
+        "model_pyannote_path": "pyannote/embedding"
     },
     "llm": {
         "api_key": "",
@@ -67,7 +70,6 @@ class ConfigManager:
             for key, value in kv.items():
                 if self.get(section, key) is None:
                     self.set(section, key, value)
-        logger.debug("默认配置检查完成")
 
     def get(self, section: str, key: str = None, default: Any = None):
         conn = self._get_conn()

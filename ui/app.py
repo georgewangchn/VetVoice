@@ -1,32 +1,23 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import os
-sys.path.append('/Users/siidt/Documents/siicode/nwt/')
 import json
-import sounddevice as sd
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
 import datetime
 from loguru import logger
 from settings import cfg
 import time
-from PySide6.QtWidgets import (QMenuBar,QLabel, QLineEdit, QTextEdit, QComboBox, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QTextBrowser, QWidget, QFrame,QMessageBox)
-from PySide6.QtCore import Qt, QTimer,QEvent
-from PySide6.QtGui import QIcon,QTextCursor
-from ui.waveview import WaveformWidget
-import sounddevice as sd
-# from qfluentwidgets import FluentWindow
-from PySide6.QtCore import Signal, Slot
-import diagnosis.llm
-import db.case_db
-import utils.common
+from PySide6.QtWidgets import (QMenuBar,QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QWidget,QMessageBox)
+from PySide6.QtCore import QEvent
+from PySide6.QtGui import QIcon
+import case.llm
+import case.sql_manage
+import json
+import os
 import ui.components.llm_panel
 import ui.components.asr_panel
 import ui.components.form_pane
 import ui.components.bt_panel
 import ui.components.set_panel
-
 class VoiceApp(QWidget):
     def __init__(self,kwargs):
         super().__init__()
@@ -39,22 +30,19 @@ class VoiceApp(QWidget):
         self.audio_queue = kwargs['audio_queue']
         self.text_queue = kwargs['text_queue']
         self.audio_receive= kwargs['audio_receive']
-        self.current_case_id = kwargs['current_case_id']
-        self.user_info=  kwargs['user_info']
-        self.llm = diagnosis.llm.LLMManager()
+        self.llm_manager = case.llm.LLMManager()
         #ui
         self.setup_ui()
-        db.case_db.init_db()
     def setup_ui(self):
         # ---------- 病例表单区域 ----------
-        self.form_panel = ui.components.form_pane.FormPanel(self.llm,self.current_case_id)
+        self.form_panel = ui.components.form_pane.FormPanel(self.llm_manager)
         self.form_panel.case_selector.currentIndexChanged.connect(self.case_selected)
        
         self.form_panel.case_selector.installEventFilter(self)
         # ---------- 右侧 BT + ASR + LLM 区域 ----------
         self.bt_panel= ui.components.bt_panel.BTPanel()
-        self.asr_panel=ui.components.asr_panel.ASRPanel(self.audio_receive,self.text_queue,self.llm)
-        self.llm_panel = ui.components.llm_panel.LLMPanel(self.llm,self.form_panel)
+        self.asr_panel=ui.components.asr_panel.ASRPanel(self.audio_receive,self.text_queue,self.llm_manager)
+        self.llm_panel = ui.components.llm_panel.LLMPanel(self.llm_manager,self.form_panel)
         
         asr_layout = QVBoxLayout()
         asr_layout.addWidget(self.bt_panel)        
@@ -74,13 +62,15 @@ class VoiceApp(QWidget):
         self.bt_panel.mic_stop.clicked.connect(self.stop_recording)
         self.bt_panel.save_pdf.clicked.connect(self.save2pdf)
         self.bt_panel.save_case.clicked.connect(self.form_panel.save)
-        self.asr_panel.input_device.currentIndexChanged.connect(lambda: cfg.save("input_device", "index", self.asr_panel.input_device.currentData()))
-        self.asr_panel.output_device.currentIndexChanged.connect(lambda: cfg.save("output_device", "index", self.asr_panel.output_device.currentData()))
+        self.asr_panel.input_device.currentIndexChanged.connect(lambda: cfg.set("input_device", "index", self.asr_panel.input_device.currentData()))
+        self.asr_panel.output_device.currentIndexChanged.connect(lambda: cfg.set("output_device", "index", self.asr_panel.output_device.currentData()))
         self.form_panel.new_case.clicked.connect(self.case_input)
         
         
         # 添加右上角用户信息与退出按钮
-        self.user_label = QLabel(f"👤 {self.user_info.get('name', '')}", self)
+        user_name = cfg.get("history", "now_login")
+        name = json.loads(cfg.get("users", user_name))["name"] if user_name else "未知用户"
+        self.user_label = QLabel(f"👤 {name}", self)
         self.logout_btn = QPushButton("退出登录", self)
         self.logout_btn.setFixedHeight(24)
         self.logout_btn.setStyleSheet("QPushButton { padding: 2px 6px; }")
@@ -97,10 +87,11 @@ class VoiceApp(QWidget):
         
         #菜单
         menu_bar = QMenuBar(self)
+        # menu_bar.setNativeMenuBar(False)
 
         # 设置菜单
         settings_menu = menu_bar.addMenu("设置")
-        action_settings = settings_menu.addAction("参数")
+        action_settings = settings_menu.addAction("全局")
         action_settings.triggered.connect(self.open_settings_dialog)
 
         # 关于菜单
@@ -136,7 +127,7 @@ class VoiceApp(QWidget):
     def eventFilter(self, obj, event):
         def _load_case_list():
             date_str = self.form_panel.date_edit.date().toString("yyyyMMdd")
-            cases = db.case_db.get_cases_by_date(date_str)
+            cases = case.sql_manage.CaseManager.get_case_by_date(date_str)
             self.form_panel.case_selector.clear()
             self.form_panel.case_selector.addItems(cases)
         if obj == self.form_panel.case_selector and event.type() == QEvent.MouseButtonPress:
@@ -163,9 +154,11 @@ class VoiceApp(QWidget):
     def case_selected(self, index):
         if index < 0:
             return
+        self.asr_panel.text_browser.clear()
         dialogue = self.form_panel.load(index)
         if dialogue:
             json_data = json.loads(dialogue)
+            
             for speaker, text in zip(json_data['speaker'], json_data['text']):
                 self.asr_panel.append_dialogue(speaker, text)
         self.form_panel.update_case_snapshot()
@@ -212,6 +205,8 @@ class VoiceApp(QWidget):
         self.form_panel.new_case.setEnabled(True)
         self.form_panel.del_case.setEnabled(True)
     def save2pdf(self):
+        
+        os.makedirs(cfg.get("app", "save_dir"), exist_ok=False)
         now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     def _on_resize(self, event):
         self.user_label.move(self.width() - 100, 10)
@@ -223,7 +218,10 @@ class VoiceApp(QWidget):
         QMessageBox.information(
             self,
             "关于 VetVoice",
-            "VetVoice 兽医声动\n智能语音电子病历系统\n版本 1.0.0"
+            "VetVoice 兽医声动\n智能语音电子病历系统\n版本 1.0.0",
+            "https://github.com/georgewangchn/VetVoice",
+            "联系方式 aigeorge@qq.com"
+            
         )
                 
 if __name__ == "__main__":

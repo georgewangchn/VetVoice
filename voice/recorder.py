@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import resampy
 import sounddevice as sd
 import numpy as np
 import threading
@@ -11,14 +10,12 @@ from multiprocessing import Queue
 import webrtcvad
 import datetime
 from settings import cfg
-SAVE_DIR = cfg.get("app", "save_dir")
 from utils.resource_path import get_webrtc_apm_lib
 class VoiceRecorder:
-    def __init__(self, audio_queue: Queue, audio_send,current_case_id):
+    def __init__(self, audio_queue: Queue, audio_send):
         self.sample_rate = 16000
         self.audio_queue = audio_queue
         self.audio_send = audio_send
-        self.current_case_id = current_case_id  
         self.audio_frames = []
         self.resample_buffer = np.array([], dtype=np.int16)
         self.apm = WebRtcApmLite(get_webrtc_apm_lib(),16000)
@@ -121,11 +118,14 @@ class VoiceRecorder:
             buff = np.concatenate([buff, block])
             if len(buff) < 480000:
                 continue
-            case_id=self.current_case_id.value.decode("utf-8").strip()   
+            from case.sql_manage import VedisManager
+            
+            case_id=VedisManager.get("current_case_id")
             now_str = datetime.datetime.now().strftime("%H%M%S")
             
             import os
-            filepath = os.path.join(SAVE_DIR, f"wav/{case_id}_{now_str}.wav")
+            os.makedirs(os.path.join(cfg.get("app", "save_dir"), "wav"), exist_ok=True)
+            filepath = os.path.join(cfg.get("app", "save_dir"), f"wav/{case_id}_{now_str}.wav")
             with wave.open(filepath, 'wb') as wf:
                 wf.setnchannels(1)
                 wf.setsampwidth(np.dtype('int16').itemsize)
@@ -169,13 +169,15 @@ class VoiceRecorder:
 
 def run(kwargs):
     """多进程录音主入口，可被循环控制"""
+    from utils.loger_util import init_subprocess_logger
+    import os
+    init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"recorder")
     start_event = kwargs['start_event']
     stop_event = kwargs['stop_event']
     audio_queue: Queue = kwargs['audio_queue']
     audio_send = kwargs['audio_send']
-    current_case_id = kwargs["current_case_id"]
 
-    recorder = VoiceRecorder(audio_queue,audio_send,current_case_id)
+    recorder = VoiceRecorder(audio_queue,audio_send)
 
     logger.info("🎙️ Recorder 进程初始化完成，等待启动指令...")
 

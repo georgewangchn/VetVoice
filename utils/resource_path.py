@@ -5,7 +5,7 @@
 import os
 from pathlib import Path
 from settings import cfg
-resource_dir = cfg.get("app","resource_dir")
+
 
 def get_resource_base_path():
     """
@@ -18,7 +18,7 @@ def get_resource_base_path():
     env_path = os.environ.get('VETVOICE_RESOURCES')
     if env_path and os.path.exists(env_path):
         return Path(env_path)
-    
+    resource_dir = cfg.get("app","resource_dir")
     return Path(resource_dir)
 
 def get_resource_path(relative_path: str = "") -> Path:
@@ -92,6 +92,7 @@ import platform
 def get_webrtc_apm_lib():
     system = platform.system().lower()
     machine = platform.machine().lower()
+    resource_dir = cfg.get("app","resource_dir")
 
     if system == "darwin":  # macOS
         if "arm" in machine:   # Apple Silicon  

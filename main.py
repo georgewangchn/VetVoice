@@ -1,26 +1,27 @@
 import sys
 import os
-import threading
 import time
 from multiprocessing import Process, Queue, Event, set_start_method, RawArray, Pipe, freeze_support
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon  # 加在顶部
-from PySide6.QtWidgets import QMessageBox
 import voice.recorder as recorder
-import voice.asr_funasr as asr
+import voice.asr as asr
 from ui.app import VoiceApp
 from settings import cfg
 from loguru import logger
 from ui.login_dialog import LoginDialog
-logger.remove()
-logger.add(sys.stderr, level="DEBUG")
+from PySide6.QtWidgets import QDialog
+from pathlib import Path
+from case.sql_manage import init_db
+import asyncio
+from qasync import QEventLoop
+
 def start_process(name, target, kwargs):
     p = Process(target=target, args=(kwargs,), name=name)
     p.daemon = True
     p.start()
     logger.info(f"启动子进程: {name} (pid={p.pid})")
     return p
-
 
 def monitor_and_restart(procs_dict, kwargs):
     while True:
@@ -49,25 +50,31 @@ if __name__ == "__main__":
     set_start_method("spawn")
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon("app.ico"))
+   
+    home =  Path.home()
+    vetvoice_folder = os.path.join(home, ".vetvoice")
+    os.makedirs(vetvoice_folder, exist_ok=True)
+    if not os.path.exists(cfg.get("app", "save_dir")):
+        from ui.path_dialog import PathDialog
+        path_dialog = PathDialog()
+        if path_dialog.exec() != QDialog.Accepted:
+            sys.exit(0)
+    
+    # log
+    save_dir = Path()
+    from utils.loger_util import init_subprocess_logger
+    import os
+    init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"main")
+    
+    # 初始化数据库
+    init_db()
+    
     # 显示登录对话框
     login_dialog = LoginDialog()
-    from PySide6.QtWidgets import QDialog
     if login_dialog.exec() != QDialog.Accepted:
         sys.exit(0)
     
-    # 获取用户选择的资源路径
-    resource_dir ,save_dir = login_dialog.get_path()
-    if resource_dir and save_dir:
-        # 资源路径已经在登录时设置到环境变量中
-        logger.info(f"使用资源路径: {resource_dir}\n使用保存路径: {save_dir}")
-        cfg.set("app", "save_dir", save_dir)  # 将参数写入配置（假设cfg支持动态更新）
-        cfg.set("app", "resource_dir", resource_dir)  # 将参数写入配置（假设cfg支持动态更新）
-        os.makedirs(os.path.join(save_dir,'wav'), exist_ok=True)
-        os.makedirs(os.path.join(save_dir,'pdf'), exist_ok=True)
-    else:
-        QMessageBox.warning("错误", "资源路径/保存路径未设置，使用默认路径")
-        logger.warning("未设置资源路径，使用默认路径")
-        sys.exit(0)
+    # 初始化多进程通信组件
 
     audio_queue = Queue(maxsize=cfg.get("process", "audio_queue_size"))
     text_queue = Queue(maxsize=cfg.get("process", "text_queue_size"))
@@ -77,27 +84,25 @@ if __name__ == "__main__":
     start_event.clear()
     stop_event.clear()
     audio_send, audio_receive = Pipe()
-    user_info = login_dialog.get_user_info()
     kwargs = {
         'start_event': start_event,
         'stop_event': stop_event,
         'audio_queue': audio_queue,
         'text_queue': text_queue,
-        'current_case_id': current_case_id,
         'audio_send': audio_send,
-        'audio_receive': audio_receive,
-        'user_info': user_info 
+        'audio_receive': audio_receive
     }
 
     procs = {}
     procs["ASRProcess"] = start_process("ASRProcess", asr.run, kwargs)
     procs["RecorderProcess"] = start_process("RecorderProcess", recorder.run, kwargs)
     
-    # monitor_thread = threading.Thread(target=monitor_and_restart, args=(procs, kwargs), daemon=True)
-    # monitor_thread.start()
+ 
     logger.info("所有子进程已启动，开始主应用...")
     voice_app = VoiceApp(kwargs)
-    
     voice_app.show() 
-
-    sys.exit(app.exec())
+    # sys.exit(app.exec())
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+    with loop:
+        loop.run_forever()
