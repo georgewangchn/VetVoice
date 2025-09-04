@@ -83,7 +83,7 @@ class VoiceApp(QWidget):
         self.resizeEvent = self._on_resize
 
         # 绑定
-        self.logout_btn.clicked.connect(self.logout_clicked)
+        self.logout_btn.clicked.connect(self.close)
         
         #菜单
         menu_bar = QMenuBar(self)
@@ -134,16 +134,6 @@ class VoiceApp(QWidget):
             _load_case_list()
         return super().eventFilter(obj, event)
     
-    def logout_clicked(self):
-        reply = QMessageBox.question(
-            self,
-            "确认退出登录",
-            "确定要退出当前用户并返回登录界面？",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
-            self.close()  # 或者执行其他切换逻辑
     def del_case_clicked(self):
         case_id = self.form_panel.case_id.text()
         if not case_id:

@@ -18,6 +18,8 @@ class SettingsDialog(QDialog):
         # -------- Tab1: 大模型 --------
         llm_tab = QWidget()
         llm_layout = QFormLayout(llm_tab)
+        
+  
 
         self.api_key_edit = QLineEdit(cfg.get("llm", "api_key", ""))
         self.api_key_edit.setPlaceholderText("大模型api_key: EMPTY")
@@ -49,7 +51,9 @@ class SettingsDialog(QDialog):
 
         self.test_btn = QPushButton("连接测试")
         self.test_btn.clicked.connect(self.test_connection)
+        
 
+        
         llm_layout.addRow("API Key:", self.api_key_edit)
         llm_layout.addRow("API Base:", self.api_base_edit)
         llm_layout.addRow("模型名:", self.model_edit)
@@ -61,7 +65,17 @@ class SettingsDialog(QDialog):
 
 
         tabs.addTab(llm_tab, "大模型")
-
+        
+        # ----------table mcp--------------
+        mcp_tab = QWidget()
+        mcp_layout=QFormLayout(mcp_tab)
+        self.mcp_checkbox = QCheckBox("启用MCP模式")
+        self.mcp_checkbox.setChecked(cfg.get("llm", "mcp", False))
+        mcp_layout.addWidget(self.mcp_checkbox)
+        mcp_layout.addWidget(QLabel("* 重启程序才能生效"))
+        tabs.addTab(mcp_tab, "MCP")
+        
+        
         # -------- Tab2: ASR --------
         asr_tab = QWidget()
         asr_layout = QFormLayout(asr_tab)
@@ -172,6 +186,7 @@ class SettingsDialog(QDialog):
         asr_model = self.asr_model_combo.currentText()
         if asr_model != "请选择 ASR 模型":
             cfg.set("asr", "model", asr_model)
+        cfg.set("llm", "mcp", self.mcp_checkbox.isChecked())
         cfg.set("asr", "denoise", self.denoise_checkbox.isChecked())
 
         cfg.set("process", "audio_queue_size", self.audio_queue_spin.value())

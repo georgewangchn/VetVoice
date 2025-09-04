@@ -5,7 +5,7 @@ from case.llm import LLMManager
 from ui.components.form_pane import FormPanel
 import asyncio
 import json
-
+from settings import cfg
 class LLMPanel(QWidget):
     def __init__(self, llm_manager: LLMManager, form_panel: FormPanel):
         super().__init__()
@@ -16,26 +16,28 @@ class LLMPanel(QWidget):
 
         self.setup_ui()
         self.llm_manager.stream_signal.connect(self.print_stream)
+        
 
     def setup_ui(self):
         layout = QVBoxLayout()
-
-        
-
         # ---------- 下方 tab 输入区 ----------
         self.tab_widget = QTabWidget()
+        self.tab_widget.setStyleSheet("PrimaryButton")
         self.tab_widget.currentChanged.connect(self.on_tab_changed)  # 绑定切换事件
-
-        tab_names = [ "🗂️ 填充","🩺 辅诊", "💊 用药", "🧪 质检"]
-        default_input_texts =[
+        
+        if cfg.get("llm","mcp"):
+            tab_names = [ "🩺️️️ 1-问诊阶段","🔬 2-检查阶段", "📊 3-报告阶段", "💊 4-治疗阶段"]
+            default_input_texts =[
             "填充电子病历",
-            "给出鉴别诊断和检查建议",
-            "给出治疗用药",
-            "检查电子病历、治疗是否规范、药品用法用量是否正常",
+            "推荐开具检查项",
+            "填充检查结果",
+            "确诊并开处方",
             ]
-        for i,name in enumerate(tab_names):
-            if i!=0:
-                continue
+        else:
+            tab_names=["📋 一键电子病历"]
+            default_input_texts =["填充电子病历"]
+        
+        for default_input_text,name in zip(default_input_texts,tab_names):
             tab = QWidget()
             tab_layout = QVBoxLayout()
             tab_layout.setContentsMargins(3, 3, 3, 3)
@@ -47,25 +49,25 @@ class LLMPanel(QWidget):
             self.tabs[name]=chat_box
 
             input_bar = QHBoxLayout()
-
             input_box = QLineEdit()
-            input_box.setText(default_input_texts[i])
+            input_box.setText(default_input_text)
             self.input_boxes[name]= input_box
             input_bar.addWidget(input_box)
 
-            generate_btn = QPushButton("发送")
+            generate_btn = QPushButton("智能体")
+            generate_btn.setObjectName("PrimaryButton")
             generate_btn.setFixedSize(50, 30)
             generate_btn.clicked.connect(
                 lambda checked=False, tab_name=name: self.send_and_generate(tab_name)
             )
             input_bar.addWidget(generate_btn)
 
-            fill_btn = QPushButton("采用")
-            fill_btn.setFixedSize(50, 30)
-            fill_btn.clicked.connect(
-                lambda checked=False, tab_name=name: self.fill_to_record(tab_name)
-            )
-            input_bar.addWidget(fill_btn)
+            # fill_btn = QPushButton("采用")
+            # fill_btn.setFixedSize(50, 30)
+            # fill_btn.clicked.connect(
+            #     lambda checked=False, tab_name=name: self.fill_to_record(tab_name)
+            # )
+            # input_bar.addWidget(fill_btn)
 
             tab_layout.addLayout(input_bar)
             tab.setLayout(tab_layout)
@@ -83,7 +85,6 @@ class LLMPanel(QWidget):
         self.input_boxes[tab_name].clear()
         self.input_boxes[tab_name].setText("重新生成:")
        
-
         # 输出用户输入
         self.append_text(tab_name,f"🧑‍⚕️ 医生: {user_text}\n")
 
@@ -92,7 +93,7 @@ class LLMPanel(QWidget):
 
         # 异步调用 LLM
         capture_case_snapshot = self.form_panel.capture_case_snapshot()
-        asyncio.create_task(self.llm_manager.run_task_async(tab_name, "生成",capture_case_snapshot,self.input_boxes[tab_name].text()))
+        asyncio.create_task(self.llm_manager.run_task_async(tab_name,capture_case_snapshot,self.input_boxes[tab_name].text()))
 
     def append_text(self,tab_name:str, text: str):
         """往 chat_box 追加文本"""
@@ -110,20 +111,21 @@ class LLMPanel(QWidget):
         if text_piece == "<<END>>":
             logger.info("LLM 推理结束")
             self.append_text(tab_name,"\n")
+            self.fill_to_record(tab_name)
             return
 
         self.append_text(tab_name,text_piece)
 
-    def load_history_to_ui(self, tab_name: str):
-        """切换病例或 tab 时，把历史对话刷到 UI"""
-        self.chat_box.clear()
-        history = self.llm_manager.dialogue_history
-        for msg in history:
-            speaker = "🧑‍⚕️ 医生" if msg["role"] == "user" else "🤖 小助手"
-            self.append_text(tab_name,f"{speaker}: {msg['content']}\n")
+    # def load_history_to_ui(self, tab_name: str):
+    #     """切换病例或 tab 时，把历史对话刷到 UI"""
+    #     self.chat_box.clear()
+    #     history = self.llm_manager.dialogue_history
+    #     for msg in history:
+    #         speaker = "🧑‍⚕️ 医生" if msg["role"] == "user" else "🤖 小助手"
+    #         self.append_text(tab_name,f"{speaker}: {msg['content']}\n")
 
-    def on_tab_changed(self, index: int):
-       pass
+    # def on_tab_changed(self, index: int):
+    #    pass
 
     def fill_to_record(self, tab_name):
         """填充到病例"""

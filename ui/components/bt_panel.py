@@ -12,9 +12,12 @@ class BTPanel(QWidget):
         bt_layout = QHBoxLayout()
         bt_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.mic_start = QPushButton("🎤 启动")
+        self.mic_start.setObjectName("PrimaryButton")
         self.mic_stop = QPushButton("⏸️ 暂停")
+        
         self.save_pdf = QPushButton("📄.PDF")
         self.save_case = QPushButton("💾保存")
+
         
         self.mic_start.setEnabled(True)
         self.mic_stop.setEnabled(False)

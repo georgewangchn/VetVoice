@@ -5,23 +5,11 @@ import json
 import traceback
 import httpx
 from case.template import *
-
-TEMPLATE_MAP = {
-    "🩺 辅诊": {
-        "生成": DIAGNOSE_TEMPLATE,
-    },
-    "🗂️ 填充": {
-        "生成": FILL_TEMPLATE,
-    },
-    "💊 用药": {
-        "生成": MEDICATION_TEMPLATE,
-    },
-    "🧪 质检": {
-        "生成": QUALITY_CHECK_TEMPLATE,
-    },
-}
+from fastmcp import Client
+import copy
 
 
+TAB_STAGE = {"🩺️️️ 1-问诊阶段":"问诊阶段","🔬 2-检查阶段":"开检查阶段", "📊 3-报告阶段":"查看检查结果阶段", "💊 4-治疗阶段":"确诊治疗阶段"}
 class LLMManager(QObject):
     stream_signal = Signal(str, str) 
     
@@ -31,6 +19,9 @@ class LLMManager(QObject):
         self.dialogue_history = []
         self.running = False
         self.buffer_stream = ""
+        self.buffer_case={}
+        self.mcp_client = Client('mcp/server.py') 
+
 
     def clear(self):
         self.asr_speaker_lst.clear()
@@ -43,40 +34,53 @@ class LLMManager(QObject):
     def __str__(self):
         import json
         return json.dumps(self.asr_speaker_lst, ensure_ascii=False, indent=2)
-    async def run_task_async(self, tab_name: str, action: str,case_snapshot:dict,command:str):
-        """异步调用 LLM 接口"""
-        logger.info(f"LLM 任务: tab={tab_name}, action={action}")
-        
+    async def run_task_async(self, tab_name: str,case_snapshot:dict,command:str):
+        BASE_URL = cfg.get("llm", "api_base").strip()
+        MODEL = cfg.get("llm", "model").strip()
 
-
-        try:
-            API_KEY = cfg.get("llm", "api_key").strip()
-            BASE_URL = cfg.get("llm", "api_base").strip()
-            BASE_URL = f"{BASE_URL}/chat/completions" if "chat/completions" not in BASE_URL else BASE_URL
-            MODEL = cfg.get("llm", "model").strip()
-
-            if not BASE_URL or not MODEL:
+        if not BASE_URL or not MODEL:
                 self.stream_signal.emit(tab_name, "<<START>>")
                 self.stream_signal.emit(tab_name, "未配置LLM，请进入【设置】【全局】【大模型】配置\n")
                 self.stream_signal.emit(tab_name, "<<END>>")
                 return
-            content ='\n'.join([ str(tup)  for tup in self.asr_speaker_lst]) 
-            if not self.asr_speaker_lst or len(content)<30:
+        content ='\n'.join([ str(tup)  for tup in self.asr_speaker_lst]) 
+        if not self.asr_speaker_lst or len(content)<30:
                 self.stream_signal.emit(tab_name, "<<START>>")
                 self.stream_signal.emit(tab_name, "无对话内容/<30字\n")
                 self.stream_signal.emit(tab_name, "<<END>>")
                 return
-            
+        if cfg.get("llm","mcp"):
+            await self.run_mcp(tab_name,case_snapshot)
+        else:
+            await self.run_llm(tab_name,case_snapshot,command)
+    async def run_mcp(self, tab_name: str,case_snapshot:dict):
+        params=copy.deepcopy(case_snapshot)
+        content ='\n'.join([ str(tup)  for tup in self.asr_speaker_lst]) 
+        params["dialogue"]=content
+        self.buffer_stream={}
+        dialogue =TEMPLATE_MAP.get(tab_name).format(**params)
+        updated_case = self.mcp_client.run_pipeline(case_snapshot, dialogue,TAB_STAGE[tab_name])
 
+    async def run_llm(self, tab_name: str, case_snapshot:dict,command:str):
+
+        """异步调用 LLM 接口"""
+        logger.info(f"LLM 任务: tab={tab_name}")
+        API_KEY = cfg.get("llm", "api_key").strip()
+        BASE_URL = cfg.get("llm", "api_base").strip()
+        BASE_URL = f"{BASE_URL}/chat/completions" if "chat/completions" not in BASE_URL else BASE_URL
+        MODEL = cfg.get("llm", "model").strip()
+
+        try:
             self.running = True
             self.stream_signal.emit(tab_name, "<<START>>")
             timeout = httpx.Timeout(60.0, read=120.0)
-            import copy
+            
             params=copy.deepcopy(case_snapshot)
+            content ='\n'.join([ str(tup)  for tup in self.asr_speaker_lst]) 
             params["dialogue"]=content
             params["command"]=command
             self.buffer_stream=""
-            logger.debug(str(TEMPLATE_MAP.get(tab_name, {}).get(action).format(**params)))
+            logger.debug(str(TEMPLATE_MAP.get(tab_name).format(**params)))
             async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream(
                     "POST",
@@ -88,7 +92,7 @@ class LLMManager(QObject):
                     json={
                         "model": MODEL,
                         "messages": [
-                            {"role": "user","content": TEMPLATE_MAP.get(tab_name, {}).get(action).format(**params)}
+                            {"role": "user","content": TEMPLATE_MAP.get(tab_name).format(**params)}
                             ],
                         "max_tokens": int(cfg.get("llm", "max_tokens", 2048)),
                         "temperature": float(cfg.get("llm", "temperature", 0.1)),

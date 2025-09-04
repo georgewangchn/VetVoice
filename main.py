@@ -15,6 +15,7 @@ from pathlib import Path
 from case.sql_manage import init_db
 import asyncio
 from qasync import QEventLoop
+import ui.cs
 
 def start_process(name, target, kwargs):
     p = Process(target=target, args=(kwargs,), name=name)
@@ -100,6 +101,7 @@ if __name__ == "__main__":
  
     logger.info("所有子进程已启动，开始主应用...")
     voice_app = VoiceApp(kwargs)
+    voice_app.setStyleSheet(ui.cs.CS)
     voice_app.show() 
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
