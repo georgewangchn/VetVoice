@@ -204,6 +204,7 @@ class VoiceApp(QWidget):
     def open_settings_dialog(self):
         dialog = ui.components.set_panel.SettingsDialog(self)
         dialog.exec()
+        self.llm_panel.setup_ui()
     def show_about_dialog(self):
         QMessageBox.information(
             self,

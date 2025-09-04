@@ -38,14 +38,15 @@ class ASRPanel(QWidget):
 
         # 输入输出设备下拉框
         device_widget = QWidget()
-        device_widget.setFixedWidth(200)
+        device_widget.setFixedWidth(300)
         device_widget.setContentsMargins(0, 0, 0, 0)
-        device_layout = QVBoxLayout()
+        device_layout = QHBoxLayout()
         self.input_device = QComboBox()
         self.output_device = QComboBox()
+        device_layout.addWidget(QLabel("音频输入"))
         device_layout.addWidget(self.input_device)
-        device_layout.addStretch(1)  # 让设备选择控件贴顶，下面空开
-        device_layout.addWidget(self.output_device)
+        # device_layout.addStretch(1)  # 让设备选择控件贴顶，下面空开
+        # device_layout.addWidget(self.output_device)
         device_widget.setLayout(device_layout)
 
         # 合并波形图 + 设备选择

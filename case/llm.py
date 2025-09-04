@@ -20,7 +20,6 @@ class LLMManager(QObject):
         self.running = False
         self.buffer_stream = ""
         self.buffer_case={}
-        self.mcp_client = Client('mcp/server.py') 
 
 
     def clear(self):
@@ -55,11 +54,34 @@ class LLMManager(QObject):
             await self.run_llm(tab_name,case_snapshot,command)
     async def run_mcp(self, tab_name: str,case_snapshot:dict):
         params=copy.deepcopy(case_snapshot)
-        content ='\n'.join([ str(tup)  for tup in self.asr_speaker_lst]) 
-        params["dialogue"]=content
-        self.buffer_stream={}
-        dialogue =TEMPLATE_MAP.get(tab_name).format(**params)
-        updated_case = self.mcp_client.run_pipeline(case_snapshot, dialogue,TAB_STAGE[tab_name])
+        dialogue ='\n'.join([ str(tup)  for tup in self.asr_speaker_lst]) 
+        logger.debug(dialogue)
+        logger.debug(case_snapshot)
+        self.buffer_case={}
+        # 调用 server 里的工具
+        async with Client("mcp/server.py") as mcp_client:
+            result = await mcp_client.call_tool(
+                "run_pipeline", 
+                {"case": case_snapshot, "dialogue": dialogue, "tab": TAB_STAGE[tab_name]}
+            )
+            print("返回结果:", result)
+            print("当前阶段:", result["stage"])
+            if result["next_tool"]:
+                fields = await mcp_client.call_tool(
+                    result["next_tool"],
+                    case=case_snapshot,
+                    dialogue=dialogue
+                )
+                updated_case = await mcp_client.call_tool(
+                    "fill_case_fields",
+                    case=case_snapshot,
+                    fields=fields
+                )
+                print("更新后的病例:", updated_case)
+
+
+     
+            self.buffer_case = result
 
     async def run_llm(self, tab_name: str, case_snapshot:dict,command:str):
 

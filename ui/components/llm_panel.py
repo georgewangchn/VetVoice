@@ -13,13 +13,23 @@ class LLMPanel(QWidget):
         self.form_panel = form_panel
         self.input_boxes = {}  
         self.tabs={}
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
 
         self.setup_ui()
         self.llm_manager.stream_signal.connect(self.print_stream)
         
 
     def setup_ui(self):
-        layout = QVBoxLayout()
+        # 清空旧内容
+        for i in reversed(range(self.layout.count())):
+            widget = self.layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+
+        self.input_boxes.clear()
+        self.tabs.clear()
+        
         # ---------- 下方 tab 输入区 ----------
         self.tab_widget = QTabWidget()
         self.tab_widget.setStyleSheet("PrimaryButton")
@@ -56,7 +66,7 @@ class LLMPanel(QWidget):
 
             generate_btn = QPushButton("智能体")
             generate_btn.setObjectName("PrimaryButton")
-            generate_btn.setFixedSize(50, 30)
+            generate_btn.setFixedSize(100, 30)
             generate_btn.clicked.connect(
                 lambda checked=False, tab_name=name: self.send_and_generate(tab_name)
             )
@@ -73,8 +83,7 @@ class LLMPanel(QWidget):
             tab.setLayout(tab_layout)
             self.tab_widget.addTab(tab, name)
 
-        layout.addWidget(self.tab_widget)
-        self.setLayout(layout)
+        self.layout.addWidget(self.tab_widget)
 
     def send_and_generate(self, tab_name):
         """用户点击生成按钮"""
@@ -124,8 +133,8 @@ class LLMPanel(QWidget):
     #         speaker = "🧑‍⚕️ 医生" if msg["role"] == "user" else "🤖 小助手"
     #         self.append_text(tab_name,f"{speaker}: {msg['content']}\n")
 
-    # def on_tab_changed(self, index: int):
-    #    pass
+    def on_tab_changed(self, index: int):
+       pass
 
     def fill_to_record(self, tab_name):
         """填充到病例"""
