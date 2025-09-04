@@ -9,11 +9,6 @@ case_snapshot={'name': '', 'phone': '', 'pet_name': '', 'species': '', 'breed': 
 async def send():
     from inspect import signature
 
-    async def call_tool_auto(client, tool_name, context):
-        tool_func = getattr(client, tool_name)
-        sig = signature(tool_func)
-        params = {k: context[k] for k in sig.parameters if k in context}
-        return await client.call_tool(tool_name, params)
     async with Client("server.py") as mcp_client:
         context = {
             "case": case_snapshot,
