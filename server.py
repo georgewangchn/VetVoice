@@ -9,41 +9,31 @@ logger.remove()  # 移除默认的 stdout handler
 logger.add(sys.stderr, level="INFO")  # 指定输出到 stderr
 
 mcp = FastMCP(name="宠物疾病诊疗流程 MCP")
-# @mcp.tool()
-# def determine_stage(case: dict, dialogue: str, tab: str):
-#     """
-#     判断病例当前阶段，调用 GPT function calling
-#     """
-#     prompt = f"""
-#     请根据病例信息和最新对话判断当前阶段：
-#     Case: {json.dumps(case, ensure_ascii=False)}
-#     Dialogue: {dialogue}
-#     Tab: {tab}
-#     可能阶段：问诊阶段 / 开检查阶段 / 查看检查结果阶段 / 确诊治疗阶段
-#     """
-#     response = await call_llm_function_calling(prompt, functions=[
-#         {
-#             "name": "determine_stage",
-#             "description": "返回病例当前阶段",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "stage": {
-#                         "type": "string",
-#                         "enum": ["问诊阶段", "开检查阶段", "查看检查结果阶段", "确诊治疗阶段"]
-#                     }
-#                 },
-#                 "required": ["stage"]
-#             }
-#         }
-#     ])
-#     stage = response.get("stage", "问诊阶段")
-#     return stage
 
 @mcp.tool()
 async def stage_inquiry(case: dict, dialogue: str):
     """
-    问诊阶段：提取缺失的问诊字段，并指定下一步工具
+    问诊阶段工具：从对话中提取病例缺失字段，并指定下一步调用的工具。
+
+    参数:
+        case (dict): 当前电子病历字段及已知的值，例如:
+            {
+                "name": "",
+                "phone": "",
+                "pet_name": "",
+                "species": "",
+                "breed": "",
+                "weight": "",
+                "deworming": "",
+                "sterilization": "",
+                "complaint": ""
+            }
+        dialogue (str): 医生与宠物主的对话文本。
+
+    返回:
+        dict: 一个包含以下键的字典:
+            - fields (dict): 提取出的字段与值，例如 {"name": "张三", "pet_name": "小黑"}。
+            - next_tool (str): 下一个需要调用的工具名，例如 "fill_case_fields"。
     """
     prompt = f"""
     请根据病例和对话提取缺失字段：
@@ -75,8 +65,8 @@ async def stage_inquiry(case: dict, dialogue: str):
     
     # 返回一个字典，包含字段和下一步工具名
     return {
-        "fields": fields,
-        "next_tool": "fill_case_fields"
+        "next_tool": "fill_case_fields",
+        "params":{"case":case,"fields":fields}
     }
 
 @mcp.tool()
@@ -143,6 +133,7 @@ async def stage_diagnosis(case: dict, dialogue: str):
         }
     ])
     return fields.get("fields", {})
+@mcp.tool()
 async def fill_case_fields(case: dict, fields: dict):
     """
     填充病例字段工具
@@ -157,8 +148,8 @@ async def fill_case_fields(case: dict, fields: dict):
 
     # 返回更新后的病例和下一步工具（None表示结束）
     return {
-        "fileds": case,
-        "next_tool": None
+        "next_tool": None,
+        "params":{"case": case}
     }
 @mcp.tool()
 async def run_pipeline(case: dict, dialogue: str, tab: str):
@@ -201,7 +192,7 @@ async def run_pipeline(case: dict, dialogue: str, tab: str):
 }
     next_tool = next_tool_map.get(stage, None)
 
-    return {"stage": stage, "next_tool": next_tool}
+    return {"next_tool": next_tool,"params":{"case":case,"dialogue":dialogue}}
 if __name__ == "__main__":
     mcp.run()
 

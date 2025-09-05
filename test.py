@@ -10,28 +10,28 @@ async def send():
     from inspect import signature
 
     async with Client("server.py") as mcp_client:
-        context = {
-            "case": case_snapshot,
-            "dialogue": dialogue,
-            "tab": "问诊阶段"
-        }
+       
+        tools = await mcp_client.list_tools()
+        print(tools)
+        _case=None
 
-        # 循环执行每一步工具，直到 next_tool 为 None
         next_tool = "run_pipeline"
+        params = {"case": case_snapshot,"dialogue": dialogue,"tab": "问诊阶段"}
+        
         while next_tool:
-            tool_func = getattr(mcp_client, next_tool)
-            sig = signature(tool_func)
-            params = {k: context[k] for k in sig.parameters if k in context}
-            
-            result = mcp_client.call_tool(next_tool,params)
+           
+            result =await  mcp_client.call_tool(next_tool,params)
             data = result.data or {}
             print(f"[{next_tool}] 返回:", data)
             
-            # 更新上下文，加入新提取的字段
-            if "fields" in data:
-                context["case"].update(data["fields"])
             
-            next_tool = data.get("next_tool")  # 下一步工具
+            next_tool = data.get("next_tool") 
+            params = data.get("params") 
+            _case=params['case']
+            
+        print("over:"+str(_case))
+            
+        
 
 
 import asyncio

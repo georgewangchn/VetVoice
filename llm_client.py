@@ -30,13 +30,8 @@ async def call_llm_function_calling(prompt: str, functions: list):
     print(resp)
 
 
-    choice = resp.choices[0]
-    msg = choice.message
-
-    # 使用属性访问而不是 dict 方法
-    if msg.function_call and msg.function_call.arguments:
-        try:
-            return json.loads(msg.function_call.arguments)
-        except json.JSONDecodeError:
-            return {}
+    msg = resp.choices[0].message
+    if msg.function_call:
+        args = msg.function_call.arguments
+        return json.loads(args)  # 返回 dict
     return {}
