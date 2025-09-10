@@ -71,9 +71,10 @@
 ``` bash
 git clone https://github.com/georgewangchn/VetVoice.git
 cd VetVoice
-pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cpu
-
-pip install -r requirements.txt
+uv venv --python=3.10
+source .venv/bin/activate
+uv pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cpu
+uv sync # or uv pip install -r requirements.txt
 python main.py
 ```
 ## 窗口程序使用步骤
