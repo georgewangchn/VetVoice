@@ -22,7 +22,8 @@ DEFAULT_CONFIG = {
         "denoise": True,
         "model":"vosk",
         "model_funasr_path": "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
-        "model_vosk_path": "vosk/vosk-model-small-cn-0.22"
+        "model_vosk_path": "vosk/vosk-model-small-cn-0.22",
+        "device":"mps"
     },
     "process": {
         "audio_queue_size": 100,
@@ -30,13 +31,14 @@ DEFAULT_CONFIG = {
     },
         
     "spk": {
-        "model_pyannote_path": "pyannote/embedding"
+        "model_pyannote_path": "pyannote/embedding",
+        "device":"mps"
     },
     "llm": {
         "api_key": "",
         "api_base": "",
         "model": ""
-    }
+    },
 }
 
 

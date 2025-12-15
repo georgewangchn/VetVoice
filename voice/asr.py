@@ -26,7 +26,7 @@ class StreamVadAsr:
         elif self.asr_model == "vosk":
             import vosk
             
-        self.asr_recognizer = AutoModel(model=model_path, model_revision="v2.0.4", disable_update=True) if self.asr_model == "funasr" else vosk.KaldiRecognizer(vosk.Model(model_path) , 16000)
+        self.asr_recognizer = AutoModel(model=model_path, model_revision="v2.0.4", disable_update=True,device=cfg.get("asr",'device')) if self.asr_model == "funasr" else vosk.KaldiRecognizer(vosk.Model(model_path) , 16000)
         self.chunk_size = [0, 64, 32]
         self.encoder_chunk_look_back = 4
         self.decoder_chunk_look_back = 1

@@ -15,7 +15,7 @@ class SpeakerReIDManager:
         # 你原来用的方式已经能加载模型，这里保留同样方式
         model = Model.from_pretrained(
             checkpoint=os.path.join(model_path, "pytorch_model.bin"),
-            map_location="cpu",
+            map_location=cfg.get("spk", "device"),
             hparams_file=os.path.join(model_path, "hparams.yaml"),
             use_auth_token=None,
             local_files_only=True
