@@ -220,4 +220,4 @@ class LLMPanel(QWidget):
         except json.JSONDecodeError as e:
                 print("JSON 解析出错：", e)
                 self.input_boxes[tab_name].setText(f"JSON 解析出错：{str(e)},重新生成：")
-    logger.info(f"已将内容填入病历")
+        logger.info(f"已将内容填入病历")

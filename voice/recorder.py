@@ -26,7 +26,7 @@ class VoiceRecorder:
         
         self.vad = webrtcvad.Vad(1)
         self.frame_len = 160  # 10ms @ 16kHz
-        self.max_segment_len = 16000 * 10  # 15秒
+        self.max_segment_len = 16000 * 1  # 15秒
         
         #保存30s的wav文件
         self._save_queue = queue.Queue(maxsize=300)
@@ -62,7 +62,7 @@ class VoiceRecorder:
                 logger.error(f"Error in audio processing: {e}")
 
             self.resample_buffer = np.concatenate([self.resample_buffer, block])
-            if len(self.resample_buffer) < 1600:
+            if len(self.resample_buffer) < 800:
                 continue
 
             num_complete = len(self.resample_buffer) // bs * bs
@@ -72,7 +72,6 @@ class VoiceRecorder:
             try:
                 for i in range(0, len(chunks) - bs + 1, bs):
                     segment = chunks[i : i + bs]
-                    # logger.debug(f"处理音频段，长度: {len(segment)} samples")
                     ns_chunk = self.apm.process(segment)
                     # logger.debug(f"apm处理音频段，长度: {len(ns_chunk)} samples")
                     # webrtcvad 需要16-bit mono PCM 16kHz，且frame长度必须是10,20或30ms，这里用10ms
@@ -85,20 +84,34 @@ class VoiceRecorder:
                         silence_count = 0
                         if len(ns_chunks) * self.frame_len >= self.max_segment_len:
                             ns_block = np.concatenate(ns_chunks)
-                            self.audio_queue.put_nowait(ns_block.copy())
+                            self.audio_queue.put_nowait((ns_block.copy(),False))
                             self._save_queue.put_nowait(ns_block.copy())
                             ns_chunks.clear()
                             logger.debug(f"语音段超长，送入queue，长度: {len(ns_block)} ")
                     else:
                         silence_count += 1
-                        if silence_count >= 20 or len(ns_chunks)*self.frame_len >= self.max_segment_len:
+                        if silence_count<10:
+                            continue
+                        if silence_count<20:
                             if ns_chunks:
                                 ns_block = np.concatenate(ns_chunks)
-                                self.audio_queue.put_nowait(ns_block.copy())
+                                self.audio_queue.put_nowait((ns_block.copy(),False))
                                 self._save_queue.put_nowait(ns_block.copy())
                                 ns_chunks.clear()
-                                logger.debug(f"静音>20个或者语音段超长，送入queue，长度: {len(ns_block)} ")
+                                logger.debug(f"静音<20个或者语音段超长，送入queue，长度: {len(ns_block)} ")
+                            continue
+                            
+                        if silence_count >= 20:
+                            if ns_chunks:
+                                ns_block = np.concatenate(ns_chunks)
+                                self.audio_queue.put_nowait((ns_block.copy(),True))
+                                self._save_queue.put_nowait(ns_block.copy())
+                            else:
+                                self.audio_queue.put_nowait((ns_chunks.copy(),True))
+                            logger.debug(f"静音>=20个或者语音段超长，送入queue，长度: {len(ns_block)} ")
+                            ns_chunks.clear()
                             silence_count = 0
+                                
             except (BrokenPipeError, EOFError) as e:
                 logger.warning(f"audio_send failed: {e}")
             except queue.Full:

@@ -66,6 +66,8 @@ def get_dynamic_silence_limit(duration, base_limit=10, min_limit=2, max_duration
     
     
 def is_meaningful(text: str):
+    if not text:
+        return False
     skip_words = {"嗯", "啊", "哈", "对", "是的", "好的", "okay", "噢", "唔", "嗯嗯", "啊啊", "哎"}
     clean_text = text.replace(" ", "")
     if not clean_text:

@@ -141,3 +141,20 @@ class ConfigManager:
 
 
 cfg = ConfigManager()
+
+import numpy as np
+from dataclasses import dataclass, field
+import datetime
+
+@dataclass
+class Utterance:
+    audio: np.ndarray
+    start_time: datetime.datetime = field(default_factory=datetime.datetime.now)
+    end_time: datetime.datetime = field(default_factory=datetime.datetime.now)
+    is_final: bool = False
+    text: str = ""
+    speaker: str = "unknown"
+
+    @property
+    def duration(self):
+        return len(self.audio) / 16000  # 16kHz
