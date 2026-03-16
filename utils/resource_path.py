@@ -69,7 +69,6 @@ def check_resources_available():
     
     # 检查关键模型文件
     required_files = [
-        'iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online/model.pt',
         'pyannote/embedding',
         'libs'
     ]
@@ -96,16 +95,16 @@ def get_webrtc_apm_lib():
 
     if system == "darwin":  # macOS
         if "arm" in machine:   # Apple Silicon  
-            return os.path.join(resource_dir, "libs/webrtc_apm/mac/arm64/libwebrtc_apm.dylib")
+            return "libs/webrtc_apm/mac/arm64/libwebrtc_apm.dylib" #os.path.join(resource_dir, "libs/webrtc_apm/mac/arm64/libwebrtc_apm.dylib")
         elif "x86" in machine or "amd64" in machine:
-            return os.path.join(resource_dir, "libs/webrtc_apm/mac/x64/libwebrtc_apm.dylib")
+            return "libs/webrtc_apm/mac/x64/libwebrtc_apm.dylib" #os.path.join(resource_dir, "libs/webrtc_apm/mac/x64/libwebrtc_apm.dylib")
 
     elif system == "linux":  # Linux
         if "x86" in machine or "amd64" in machine:
-            return os.path.join(resource_dir, "libs/webrtc_apm/linux/x64/libwebrtc_apm.so")
+            return "libs/webrtc_apm/linux/x64/libwebrtc_apm.so" #os.path.join(resource_dir, "libs/webrtc_apm/linux/x64/libwebrtc_apm.so")
 
     elif system == "windows":  # Windows
         if "x86" in machine or "amd64" in machine:
-            return os.path.join(resource_dir, "libs/webrtc_apm/linux/x86_64/libwebrtc_apm.dll")
+            return "libs/webrtc_apm/linux/x86_64/libwebrtc_apm.dll" #os.path.join(resource_dir, "libs/webrtc_apm/linux/x86_64/libwebrtc_apm.dll")
 
     raise RuntimeError(f"Unsupported platform: {system} {machine}")

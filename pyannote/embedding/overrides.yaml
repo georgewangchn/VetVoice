@@ -1,0 +1,12 @@
+- protocol=VoxCeleb.SpeakerVerification.VoxCeleb_X
+- task=SpeakerEmbedding
+- task.num_workers=20
+- task.min_duration=2
+- task.duration=5.
+- task.num_classes_per_batch=64
+- task.num_chunks_per_class=4
+- task.margin=10.0
+- task.scale=50.
+- model=XVectorSincNet
+- trainer.gpus=1
+- +augmentation=background_then_reverb

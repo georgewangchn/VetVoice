@@ -1,0 +1,6 @@
+sample_rate: 16000
+num_channels: 1
+sincnet:
+  stride: 10
+  sample_rate: 16000
+dimension: 512
