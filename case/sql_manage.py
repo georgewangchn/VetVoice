@@ -3,15 +3,23 @@ import os
 from settings import cfg
 from typing import Dict, List, Any, Type
 import json
+
 save_dir = cfg.get("app", "save_dir")
 DB_PATH = os.path.join(save_dir, "vv.db")
 
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    return conn
+    """从连接池获取数据库连接"""
+    from utils.db_pool import get_pool
+    pool = get_pool(DB_PATH, pool_size=5)
+    return pool.get_connection()
+
+
+def return_conn(conn):
+    """归还连接到连接池"""
+    from utils.db_pool import get_pool
+    pool = get_pool(DB_PATH, pool_size=5)
+    pool.return_connection(conn)
 
 
 class BaseTableManagerMeta(type):
@@ -30,47 +38,65 @@ class BaseTableManager(metaclass=BaseTableManagerMeta):
     """数据库表管理基类"""
     table_name: str = ""
     schema: str = ""   # 子类必须定义
+    indexes: List[str] = []  # 子类可选定义的索引列表
 
     @classmethod
     def init_table(cls):
         conn = get_conn()
-        conn.execute(cls.schema)
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute(cls.schema)
+            # 创建索引
+            for index_sql in cls.indexes:
+                try:
+                    conn.execute(index_sql)
+                except sqlite3.Error:
+                    # 索引可能已存在，忽略错误
+                    pass
+            conn.commit()
+        finally:
+            return_conn(conn)
 
     @classmethod
     def insert(cls, data: Dict[str, Any]):
         conn = get_conn()
-        fields = ",".join(data.keys())
-        placeholders = ",".join(["?"] * len(data))
-        sql = f"INSERT OR REPLACE INTO {cls.table_name} ({fields}) VALUES ({placeholders})"
-        conn.execute(sql, tuple(data.values()))
-        conn.commit()
-        conn.close()
+        try:
+            fields = ",".join(data.keys())
+            placeholders = ",".join(["?"] * len(data))
+            sql = f"INSERT OR REPLACE INTO {cls.table_name} ({fields}) VALUES ({placeholders})"
+            conn.execute(sql, tuple(data.values()))
+            conn.commit()
+        finally:
+            return_conn(conn)
 
     @classmethod
     def delete(cls, where: str, params: tuple):
         conn = get_conn()
-        sql = f"DELETE FROM {cls.table_name} WHERE {where}"
-        conn.execute(sql, params)
-        conn.commit()
-        conn.close()
+        try:
+            sql = f"DELETE FROM {cls.table_name} WHERE {where}"
+            conn.execute(sql, params)
+            conn.commit()
+        finally:
+            return_conn(conn)
 
     @classmethod
     def get_one(cls, where: str, params: tuple) -> Dict[str, Any] | None:
         conn = get_conn()
-        sql = f"SELECT * FROM {cls.table_name} WHERE {where}"
-        row = conn.execute(sql, params).fetchone()
-        conn.close()
-        return dict(row) if row else None
+        try:
+            sql = f"SELECT * FROM {cls.table_name} WHERE {where}"
+            row = conn.execute(sql, params).fetchone()
+            return dict(row) if row else None
+        finally:
+            return_conn(conn)
 
     @classmethod
     def get_all(cls, where: str = "1=1", params: tuple = ()) -> List[Dict[str, Any]]:
         conn = get_conn()
-        sql = f"SELECT * FROM {cls.table_name} WHERE {where}"
-        rows = conn.execute(sql, params).fetchall()
-        conn.close()
-        return [dict(r) for r in rows]
+        try:
+            sql = f"SELECT * FROM {cls.table_name} WHERE {where}"
+            rows = conn.execute(sql, params).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            return_conn(conn)
 
 
 # -------------------------------------------------
@@ -98,21 +124,30 @@ class CaseManager(BaseTableManager):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_cases_created_at ON cases(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_cases_name ON cases(name)",
+        "CREATE INDEX IF NOT EXISTS idx_cases_pet_name ON cases(pet_name)",
+        "CREATE INDEX IF NOT EXISTS idx_cases_phone ON cases(phone)",
+    ]
+
     @classmethod
     def get_case_by_date(cls, date_str: str=None) -> List[str]:
         conn = get_conn()
-        if not date_str:
-            results = conn.execute("""
-                SELECT case_id FROM cases
-                WHERE DATE(created_at) = DATE('now')
-                ORDER BY created_at DESC
-            """).fetchall()
-        else:
-            sql = "SELECT case_id FROM cases WHERE case_id LIKE ? ORDER BY created_at DESC"
-            pattern = f"{date_str}%"
-            results = conn.execute(sql, (pattern,)).fetchall()
-        conn.close()
-        return [r["case_id"] for r in results]
+        try:
+            if not date_str:
+                results = conn.execute("""
+                    SELECT case_id FROM cases
+                    WHERE DATE(created_at) = DATE('now')
+                    ORDER BY created_at DESC
+                """).fetchall()
+            else:
+                sql = "SELECT case_id FROM cases WHERE case_id LIKE ? ORDER BY created_at DESC"
+                pattern = f"{date_str}%"
+                results = conn.execute(sql, (pattern,)).fetchall()
+            return [r["case_id"] for r in results]
+        finally:
+            return_conn(conn)
 
 
 class VedisManager(BaseTableManager):
@@ -124,15 +159,20 @@ class VedisManager(BaseTableManager):
             type TEXT
         )
     """
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_vedis_type ON vedis(type)",
+    ]
 
     @classmethod
     def init_table(cls):
         """初始化表并在启动时清空"""
         conn = get_conn()
-        conn.execute(cls.schema)
-        conn.execute(f"DELETE FROM {cls.table_name}")  # 系统启动时清空缓存
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute(cls.schema)
+            conn.execute(f"DELETE FROM {cls.table_name}")  # 系统启动时清空缓存
+            conn.commit()
+        finally:
+            return_conn(conn)
 
     @classmethod
     def set(cls, key: str, value):
@@ -143,40 +183,49 @@ class VedisManager(BaseTableManager):
             raw, vtype = str(value), "str"
 
         conn = get_conn()
-        conn.execute(f"""
-            INSERT OR REPLACE INTO {cls.table_name}(key, value, type)
-            VALUES (?, ?, ?)
-        """, (key, raw, vtype))
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute(f"""
+                INSERT OR REPLACE INTO {cls.table_name}(key, value, type)
+                VALUES (?, ?, ?)
+            """, (key, raw, vtype))
+            conn.commit()
+        finally:
+            return_conn(conn)
 
     @classmethod
     def get(cls, key: str):
         """获取数据，自动解析 json"""
         conn = get_conn()
-        row = conn.execute(
-            f"SELECT value, type FROM {cls.table_name} WHERE key=?", (key,)
-        ).fetchone()
-        conn.close()
-        if not row:
-            return None
-        return json.loads(row["value"]) if row["type"] == "json" else row["value"]
+        try:
+            row = conn.execute(
+                f"SELECT value, type FROM {cls.table_name} WHERE key=?", (key,)
+            ).fetchone()
+            if not row:
+                return None
+            return json.loads(row["value"]) if row["type"] == "json" else row["value"]
+        finally:
+            return_conn(conn)
 
     @classmethod
     def delete(cls, key: str):
         """删除指定 key"""
         conn = get_conn()
-        conn.execute(f"DELETE FROM {cls.table_name} WHERE key=?", (key,))
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute(f"DELETE FROM {cls.table_name} WHERE key=?", (key,))
+            conn.commit()
+        finally:
+            return_conn(conn)
 
     @classmethod
     def clear(cls):
         """清空表"""
         conn = get_conn()
-        conn.execute(f"DELETE FROM {cls.table_name}")
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute(f"DELETE FROM {cls.table_name}")
+            conn.commit()
+        finally:
+            return_conn(conn)
+
 
 # -------------------------------------------------
 # 自动初始化所有表

@@ -7,8 +7,8 @@ from loguru import logger
 from settings import cfg
 import time
 from PySide6.QtWidgets import (QMenuBar,QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QWidget,QMessageBox)
-from PySide6.QtCore import QEvent
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QIcon, QShortcut, QKeySequence
 import case.llm
 import case.sql_manage
 import json
@@ -18,12 +18,15 @@ import ui.components.asr_panel
 import ui.components.form_pane
 import ui.components.bt_panel
 import ui.components.set_panel
+
 class VoiceApp(QWidget):
     def __init__(self,kwargs):
         super().__init__()
         self.setWindowTitle("VetVoice-兽医声动|智能语音电子病历")
         self.setWindowIcon(QIcon("app.ico"))
         self.resize(1400, 900)
+        # 设置窗口最小尺寸
+        self.setMinimumSize(1000, 700)
         #
         self.start_event = kwargs['start_event']
         self.stop_event = kwargs['stop_event']
@@ -62,6 +65,11 @@ class VoiceApp(QWidget):
         self.bt_panel.mic_stop.clicked.connect(self.stop_recording)
         self.bt_panel.save_pdf.clicked.connect(self.save2pdf)
         self.bt_panel.save_case.clicked.connect(self.form_panel.save)
+        # 添加快捷键提示
+        self.bt_panel.mic_start.setToolTip("启动录音 (Space)")
+        self.bt_panel.mic_stop.setToolTip("暂停录音 (Space)")
+        self.bt_panel.save_case.setToolTip("保存病例 (Ctrl+S)")
+        self.form_panel.new_case.setToolTip("新增病例 (Ctrl+N)")
         self.asr_panel.input_device.currentIndexChanged.connect(lambda: cfg.set("input_device", "index", self.asr_panel.input_device.currentData()))
         self.asr_panel.output_device.currentIndexChanged.connect(lambda: cfg.set("output_device", "index", self.asr_panel.output_device.currentData()))
         self.form_panel.new_case.clicked.connect(self.case_input)
@@ -84,7 +92,7 @@ class VoiceApp(QWidget):
 
         # 绑定
         self.logout_btn.clicked.connect(self.close)
-        
+
         #菜单
         menu_bar = QMenuBar(self)
         # menu_bar.setNativeMenuBar(False)
@@ -101,6 +109,20 @@ class VoiceApp(QWidget):
 
         # 将菜单栏添加到布局（在最上方）
         self.layout().setMenuBar(menu_bar)
+
+        # 添加快捷键支持
+        # Ctrl+S: 保存
+        shortcut_save = QShortcut(QKeySequence.StandardKey.Save, self)
+        shortcut_save.activated.connect(self.form_panel.save)
+
+        # Ctrl+N: 新增病例
+        shortcut_new = QShortcut(QKeySequence("Ctrl+N"), self)
+        shortcut_new.activated.connect(self.case_input)
+
+        # Space: 启动/暂停录音
+        shortcut_space = QShortcut(QKeySequence(Qt.Key.Key_Space), self)
+        shortcut_space.setContext(Qt.ShortcutContext.WidgetShortcut)  # 仅在有焦点时响应
+        shortcut_space.activated.connect(self.toggle_recording)
         
     def closeEvent(self, event):
         if not self.form_panel.case_id.text().strip():
@@ -194,6 +216,14 @@ class VoiceApp(QWidget):
         self.form_panel.case_selector.setEnabled(True)
         self.form_panel.new_case.setEnabled(True)
         self.form_panel.del_case.setEnabled(True)
+
+    def toggle_recording(self):
+        """切换录音状态（用于 Space 快捷键）"""
+        if self.bt_panel.mic_start.isEnabled():
+            self.start_recording()
+        else:
+            self.stop_recording()
+
     def save2pdf(self):
         
         os.makedirs(cfg.get("app", "save_dir"), exist_ok=False)

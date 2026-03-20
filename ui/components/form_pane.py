@@ -203,7 +203,7 @@ class FormPanel(QWidget):
             "results": self.checkup_text.toPlainText(),
             "diagnosis": self.diagnosis_text.text(),
             "treatment": self.treatment_text.toPlainText(),
-            "dialogue": str(self.llm)  
+            "dialogue": str(self.llm)
         }
         CaseManager.insert(case_data)
         self.initial_case_snapshot=self.capture_case_snapshot()
@@ -213,31 +213,27 @@ class FormPanel(QWidget):
         self.clear()
         self.case_selector.removeItem(self.case_selector.currentIndex())
         self.llm.clear()  # 清空 LLM 对话内容
+
+    def _prefill_common_data(self):
+        """预填常见信息，简化新增病例流程"""
+        # 预填充一些常见的选择项
+        self.species_select.setCurrentIndex(1)  # 默认选择 "狗"
+        self.deworming_select.setCurrentIndex(-1)  # 驱虫不预设
+        self.sterilization_select.setCurrentIndex(-1)  # 绝育不预设
+
     def new(self):
         if  self.case_id.text().strip() and not self.is_case_empty():
             self.save()
             self.case_selector.addItem(self.case_id.text().strip())
             self.clear()
             self.llm.clear()
-        # if not self.case_id.text().strip():
-        #    #case_id 为空，说明是第一次创建 
-        #     current_date = datetime.datetime.now().strftime("%Y%m%d")
-        #     count = len(CaseManager.get_case_by_date())
-        #     self.case_id.setText(f"{current_date}_{count+1}")
-        #     VedisManager.set("current_case_id", self.case_id.text())
-           
-        # else:
-        #     # case_id 不为空，说明是已有病例，检查是否修改
-        #     if not self.is_case_empty() :
-        #         self.save()
-        #         self.case_selector.addItem(self.case_id.text().strip())
-        #         self.clear()
-        #         self.llm.clear()
+        # 预填常见信息
+        self._prefill_common_data()
+
         current_date = datetime.datetime.now().strftime("%Y%m%d")
         count = len(CaseManager.get_case_by_date())
         self.case_id.setText(f"{current_date}_{count+1}")
         VedisManager.set("current_case_id", self.case_id.text())
-            
             
             
  

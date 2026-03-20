@@ -29,7 +29,7 @@ DEFAULT_CONFIG = {
         "audio_queue_size": 100,
         "text_queue_size": 100
     },
-        
+
     "spk": {
         "model_pyannote_path": "pyannote/embedding",
         "device":"mps"
@@ -44,27 +44,40 @@ DEFAULT_CONFIG = {
 
 class ConfigManager:
     def __init__(self):
+        # 先初始化连接池
+        from utils.db_pool import get_pool
+        self._db_pool = get_pool(DB_PATH, pool_size=3)
+
         self._init_db()
         self._ensure_defaults()
 
     def _get_conn(self):
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL;")  # 并发读写友好
-        return conn
+        """从连接池获取连接"""
+        return self._db_pool.get_connection()
+
+    def _return_conn(self, conn):
+        """归还连接到连接池"""
+        self._db_pool.return_connection(conn)
 
     def _init_db(self):
         conn = self._get_conn()
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS config (
-                section TEXT,
-                key TEXT,
-                value TEXT,
-                PRIMARY KEY (section, key)
-            )
-        """)
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS config (
+                    section TEXT,
+                    key TEXT,
+                    value TEXT,
+                    PRIMARY KEY (section, key)
+                )
+            """)
+            # 添加索引
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_config_section
+                ON config(section)
+            """)
+            conn.commit()
+        finally:
+            self._return_conn(conn)
 
     def _ensure_defaults(self):
         """如果数据库里没有某些默认配置，则写入"""
@@ -75,30 +88,33 @@ class ConfigManager:
 
     def get(self, section: str, key: str = None, default: Any = None):
         conn = self._get_conn()
-        if key is None:
-            rows = conn.execute(
-                "SELECT key, value FROM config WHERE section=?", (section,)
-            ).fetchall()
-            conn.close()
-            if not rows:
-                return default
-            return {row["key"]: self._deserialize(row["value"]) for row in rows}
-        else:
-            row = conn.execute(
-                "SELECT value FROM config WHERE section=? AND key=?",
-                (section, key),
-            ).fetchone()
-            conn.close()
-            return self._deserialize(row["value"]) if row else default
+        try:
+            if key is None:
+                rows = conn.execute(
+                    "SELECT key, value FROM config WHERE section=?", (section,)
+                ).fetchall()
+                if not rows:
+                    return default
+                return {row["key"]: self._deserialize(row["value"]) for row in rows}
+            else:
+                row = conn.execute(
+                    "SELECT value FROM config WHERE section=? AND key=?",
+                    (section, key),
+                ).fetchone()
+                return self._deserialize(row["value"]) if row else default
+        finally:
+            self._return_conn(conn)
 
     def set(self, section: str, key: str, value: Any):
         conn = self._get_conn()
-        conn.execute(
-            "INSERT OR REPLACE INTO config (section, key, value) VALUES (?, ?, ?)",
-            (section, key, self._serialize(value)),
-        )
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO config (section, key, value) VALUES (?, ?, ?)",
+                (section, key, self._serialize(value)),
+            )
+            conn.commit()
+        finally:
+            self._return_conn(conn)
 
     def set_save(self, section: str, key: str, value: Any):
         """和 set 等价，SQLite 会立即持久化"""
@@ -107,15 +123,17 @@ class ConfigManager:
     def as_dict(self) -> Dict[str, Dict[str, Any]]:
         """返回整个配置为 dict"""
         conn = self._get_conn()
-        rows = conn.execute("SELECT section, key, value FROM config").fetchall()
-        conn.close()
-        result: Dict[str, Dict[str, Any]] = {}
-        for row in rows:
-            sec = row["section"]
-            if sec not in result:
-                result[sec] = {}
-            result[sec][row["key"]] = self._deserialize(row["value"])
-        return result
+        try:
+            rows = conn.execute("SELECT section, key, value FROM config").fetchall()
+            result: Dict[str, Dict[str, Any]] = {}
+            for row in rows:
+                sec = row["section"]
+                if sec not in result:
+                    result[sec] = {}
+                result[sec][row["key"]] = self._deserialize(row["value"])
+            return result
+        finally:
+            self._return_conn(conn)
 
     def __getitem__(self, section):
         return self.get(section, None, {})
