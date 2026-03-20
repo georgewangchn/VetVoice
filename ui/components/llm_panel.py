@@ -1,24 +1,27 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, QTextEdit
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, QTextEdit, QLabel
 from loguru import logger
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QTextCursor, QFont
+from PySide6.QtCore import QTimer, Qt
 from case.llm import LLMManager
 from ui.components.form_pane import FormPanel
 import asyncio
 import json
 from settings import cfg
+
 class LLMPanel(QWidget):
     def __init__(self, llm_manager: LLMManager, form_panel: FormPanel):
         super().__init__()
         self.llm_manager = llm_manager
         self.form_panel = form_panel
-        self.input_boxes = {}  
+        self.input_boxes = {}
         self.tabs={}
+        self.loading_labels = {}
+        self.loading_animations = {}
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
 
         self.setup_ui()
         self.llm_manager.stream_signal.connect(self.print_stream)
-        
 
     def setup_ui(self):
         # 清空旧内容
@@ -29,12 +32,12 @@ class LLMPanel(QWidget):
 
         self.input_boxes.clear()
         self.tabs.clear()
-        
+
         # ---------- 下方 tab 输入区 ----------
         self.tab_widget = QTabWidget()
         self.tab_widget.setStyleSheet("PrimaryButton")
         self.tab_widget.currentChanged.connect(self.on_tab_changed)  # 绑定切换事件
-        
+
         if cfg.get("llm","mcp"):
             tab_names = [ "🩺️️️ 1-问诊阶段","🔬 2-检查阶段", "📊 3-报告阶段", "💊 4-治疗阶段"]
             default_input_texts =[
@@ -46,7 +49,7 @@ class LLMPanel(QWidget):
         else:
             tab_names=["📋 一键电子病历"]
             default_input_texts =["填充电子病历"]
-        
+
         for default_input_text,name in zip(default_input_texts,tab_names):
             tab = QWidget()
             tab_layout = QVBoxLayout()
@@ -57,6 +60,14 @@ class LLMPanel(QWidget):
             chat_box.setPlaceholderText("这里显示 AI 输出…")
             tab_layout.addWidget(chat_box)
             self.tabs[name]=chat_box
+
+            # 思考中...加载动画
+            loading_label = QLabel("🤔 思考中...")
+            loading_label.setAlignment(Qt.AlignCenter)
+            loading_label.setStyleSheet("font-weight: bold; color: #007bff;")
+            loading_label.hide()
+            tab_layout.addWidget(loading_label)
+            self.loading_labels[name] = loading_label
 
             input_bar = QHBoxLayout()
             input_box = QLineEdit()
@@ -93,7 +104,7 @@ class LLMPanel(QWidget):
 
         self.input_boxes[tab_name].clear()
         self.input_boxes[tab_name].setText("重新生成:")
-       
+
         # 输出用户输入
         self.append_text(tab_name,f"🧑‍⚕️ 医生: {user_text}\n")
 
@@ -116,25 +127,57 @@ class LLMPanel(QWidget):
         if text_piece == "<<START>>":
             logger.info("LLM 推理开始...")
             self.append_text(tab_name,"🤖 小助手: ")
+            # 显示"思考中..."加载动画
+            self.start_loading_animation(tab_name)
             return
         if text_piece == "<<END>>":
             logger.info("LLM 推理结束")
             self.append_text(tab_name,"\n")
+            # 隐藏"思考中..."加载动画
+            self.stop_loading_animation(tab_name)
             self.fill_to_record(tab_name)
             return
 
         self.append_text(tab_name,text_piece)
 
-    # def load_history_to_ui(self, tab_name: str):
-    #     """切换病例或 tab 时，把历史对话刷到 UI"""
-    #     self.chat_box.clear()
-    #     history = self.llm_manager.dialogue_history
-    #     for msg in history:
-    #         speaker = "🧑‍⚕️ 医生" if msg["role"] == "user" else "🤖 小助手"
-    #         self.append_text(tab_name,f"{speaker}: {msg['content']}\n")
+    def start_loading_animation(self, tab_name):
+        """启动"思考中..."加载动画"""
+        if tab_name in self.loading_labels:
+            self.loading_labels[tab_name].show()
+            # 创建旋转动画
+            self.loading_animations[tab_name] = QTimer(self)
+            self.loading_animations[tab_name].timeout.connect(
+                lambda: self.update_loading_text(tab_name)
+            )
+            self.loading_animations[tab_name].start(500)  # 每 500ms 更新一次
+
+    def stop_loading_animation(self, tab_name):
+        """停止"思考中..."加载动画"""
+        if tab_name in self.loading_labels:
+            self.loading_labels[tab_name].hide()
+        if tab_name in self.loading_animations:
+            self.loading_animations[tab_name].stop()
+            del self.loading_animations[tab_name]
+
+    def update_loading_text(self, tab_name):
+        """更新"思考中..."文本"""
+        if tab_name not in self.loading_labels:
+            return
+
+        loading_texts = ["🤔 思考中...", "💭 分析中...", "🔍 查找数据...", "✍️ 生成中...", "🤔 思考中..."]
+        current_text = self.loading_labels[tab_name].text()
+        try:
+            current_index = loading_texts.index(current_text)
+            next_index = (current_index + 1) % len(loading_texts)
+        except ValueError:
+            next_index = 0
+        self.loading_labels[tab_name].setText(loading_texts[next_index])
 
     def on_tab_changed(self, index: int):
-       pass
+        # 切换 tab 时，隐藏所有加载动画
+        for tab_name in self.loading_labels:
+            self.stop_loading_animation(tab_name)
+
     def fill_to_record(self, tab_name):
         print("llm mcp:")
         print(type(cfg.get("llm","mcp")))
@@ -149,7 +192,6 @@ class LLMPanel(QWidget):
         if data and len(data)>0:
             logger.debug("\nmcp 获取病历："+str(data))
         try:
-                    
                     if "name" in data and  data["name"]:
                         self.form_panel.name_input.setText(data["name"])
                     if "phone" in data and  data["phone"]:
@@ -166,7 +208,7 @@ class LLMPanel(QWidget):
                         self.form_panel.deworming_select.setCurrentText(data["deworming"])
                     if "sterilization" in data and  data["sterilization"]:
                         self.form_panel.sterilization_select.setCurrentText(data["sterilization"])
-                    
+
                     if "complaint" in data and  data["complaint"]:
                         self.form_panel.complaint_text.setPlainText(data["complaint"])
                     if "checkup" in data and  data["checkup"]:
@@ -177,7 +219,7 @@ class LLMPanel(QWidget):
                         self.form_panel.treatment_text.setPlainText(data["treatment"])
         except Exception as e:
             logger.error(str(e))
-                        
+
     def fill_to_record_not_mcp(self, tab_name):
         """填充到病例"""
         buffer_stream = self.llm_manager.buffer_stream
@@ -191,7 +233,7 @@ class LLMPanel(QWidget):
                     logger.debug("json_str:\n"+json_str)
                     data = json.loads(json_str)
                     logger.debug("\n解析为 Python 字典成功："+str(data))
-                    
+
                     if "name" in data and  data["name"]:
                         self.form_panel.name_input.setText(data["name"])
                     if "phone" in data and  data["phone"]:
@@ -208,7 +250,7 @@ class LLMPanel(QWidget):
                         self.form_panel.deworming_select.setCurrentText(data["deworming"])
                     if "sterilization" in data and  data["sterilization"]:
                         self.form_panel.sterilization_select.setCurrentText(data["sterilization"])
-                    
+
                     if "complaint" in data and  data["complaint"]:
                         self.form_panel.complaint_text.setPlainText(data["complaint"])
                     if "checkup" in data and  data["checkup"]:
