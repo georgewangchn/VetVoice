@@ -1,7 +1,7 @@
 CS = """
 QWidget {
     background-color: #f5f5f5;
-    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    font-family: "PingFang SC", "-apple-system", "BlinkMacSystemFont", sans-serif;
     font-size: 14px;
     color: #333333;
 }
