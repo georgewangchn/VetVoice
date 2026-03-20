@@ -61,11 +61,18 @@ if __name__ == "__main__":
         if path_dialog.exec() != QDialog.Accepted:
             sys.exit(0)
     
-    # log
+    # log - 使用新的结构化日志系统
+    from utils.logger_config import LoggerConfig
     save_dir = Path()
-    from utils.loger_util import init_subprocess_logger
     import os
-    init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"main")
+    log_dir = os.path.join(cfg.get("app", "save_dir"), "log")
+    LoggerConfig.init_logger(
+        log_dir=log_dir,
+        app_name="VetVoice",
+        level="INFO",
+        rotation="10 MB",
+        retention="14 days"
+    )
     
     # 初始化数据库
     init_db()
