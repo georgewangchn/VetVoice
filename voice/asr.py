@@ -29,12 +29,12 @@ class StreamVadAsr:
         elif self.asr_model == "vosk":
             import vosk
             
-        # self.asr_recognizer = AutoModel(model=model_path, model_revision="v2.0.4", disable_update=True,device=cfg.get("asr",'device')) if self.asr_model == "funasr" else vosk.KaldiRecognizer(vosk.Model(model_path) , 16000)
-        self.asr_recognizer=AutoModel(model="FunAudioLLM/Fun-ASR-Nano-2512",
-                                      trust_remote_code=True,
-                                      disable_update=True,
-                                      remote_code="./model.py",
-                                      device="mps")
+        self.asr_recognizer = AutoModel(model=model_path, model_revision="v2.0.4", disable_update=True,device=cfg.get("asr",'device')) if self.asr_model == "funasr" else vosk.KaldiRecognizer(vosk.Model(model_path) , 16000)
+        # self.asr_recognizer=AutoModel(model="FunAudioLLM/Fun-ASR-Nano-2512",
+        #                               trust_remote_code=True,
+        #                               disable_update=True,
+        #                               remote_code="./model.py",
+        #                               device="mps")
         self.asr_buffer = []
         self.asr_text_buffer=''
         self.asr_text=''
