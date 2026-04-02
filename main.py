@@ -1,4 +1,16 @@
 import sys
+import warnings
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message="torchcodec is not installed correctly"
+)
+warnings.filterwarnings(
+    "ignore",
+    message="torchcodec"
+)
+
 import os
 import time
 from multiprocessing import Process, Queue, Event, set_start_method, RawArray, Pipe, freeze_support
@@ -55,21 +67,61 @@ if __name__ == "__main__":
     home =  Path.home()
     vetvoice_folder = os.path.join(home, ".vetvoice")
     os.makedirs(vetvoice_folder, exist_ok=True)
-    if not os.path.exists(cfg.get("app", "save_dir")):
-        from ui.path_dialog import PathDialog
-        path_dialog = PathDialog()
-        if path_dialog.exec() != QDialog.Accepted:
-            sys.exit(0)
+
+    # 检查资源路径和模型状态（仅在有资源路径时检查）
+    resource_dir = cfg.get("app", "resource_dir", "")
+    save_dir_cfg = cfg.get("app", "save_dir", "")
+
+    if resource_dir and save_dir_cfg:
+        # 检查模型状态
+        from utils.model_downloader import ModelDownloader
+        logger.info("🔍 检查模型状态...")
+
+        try:
+            downloader = ModelDownloader()
+
+            # 检查当前配置的ASR模型
+            current_asr = cfg.get("asr", "model", "vosk")
+
+            # 检查必要的模型
+            check_models = [current_asr]
+
+            # 如果没有模型，设置标志，不启动音频处理进程
+            has_models = True
+            missing_models = []
+
+            for model_type in check_models:
+                if not downloader.check_model_exists(model_type):
+                    has_models = False
+                    missing_models.append(downloader.MODELS[model_type]['name'])
+                    logger.warning(f"⚠️ 缺少模型: {downloader.MODELS[model_type]['name']}")
+
+            if not has_models:
+                logger.warning("⚠️ 检测到缺少模型，程序将在受限模式下运行")
+                logger.info("请在设置中下载模型文件后重启程序")
+            else:
+                logger.info("✅ 所需模型已就绪")
+
+        except Exception as e:
+            logger.error(f"模型检查失败: {e}")
+            logger.warning("程序将继续启动")
+            has_models = False
+    else:
+        logger.info("⚠️ 未设置资源路径或保存路径，不启动模型相关进程")
+        has_models = False
     
     # log
-    save_dir = Path()
-    from utils.loger_util import init_subprocess_logger
-    import os
-    init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"main")
-    
-    # 初始化数据库
-    init_db()
-    
+    save_dir = cfg.get("app", "save_dir")
+    if save_dir:
+        from utils.loger_util import init_subprocess_logger
+        init_subprocess_logger(os.path.join(save_dir, "log"), "main")
+    else:
+        logger.warning("未设置保存路径，日志将输出到控制台")
+
+    # 初始化数据库（仅在设置了save_dir时初始化）
+    if save_dir_cfg:
+        init_db()
+
     # 显示登录对话框
     login_dialog = LoginDialog()
     if login_dialog.exec() != QDialog.Accepted:
@@ -95,10 +147,19 @@ if __name__ == "__main__":
     }
 
     procs = {}
-    procs["ASRProcess"] = start_process("ASRProcess", asr.run, kwargs)
+
+    # 启动录音进程（录音功能不依赖模型可以独立运行）
     procs["RecorderProcess"] = start_process("RecorderProcess", recorder.run, kwargs)
-    
- 
+    logger.info("Recorder进程已启动")
+
+    # 只有在有模型的情况下才启动ASR进程（语音识别和说话人识别需要模型）
+    if 'has_models' in locals() and has_models:
+        procs["ASRProcess"] = start_process("ASRProcess", asr.run, kwargs)
+        logger.info("ASR进程已启动")
+    else:
+        logger.warning("由于缺少模型或未设置资源路径，不启动ASR进程")
+
+
     logger.info("所有子进程已启动，开始主应用...")
     voice_app = VoiceApp(kwargs)
     voice_app.setStyleSheet(ui.cs.CS)

@@ -4,7 +4,7 @@ from settings import cfg
 from typing import Dict, List, Any, Type
 import json
 save_dir = cfg.get("app", "save_dir")
-DB_PATH = os.path.join(save_dir, "vv.db")
+DB_PATH = os.path.join(save_dir, "data.db")
 
 
 def get_conn():

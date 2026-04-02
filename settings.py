@@ -2,7 +2,6 @@ import os
 import sqlite3
 from typing import Any, Dict
 from pathlib import Path
-from loguru import logger
 
 home = os.environ.get("VETVOICE_PATH", Path.home())
 vetvoice_folder = os.path.join(home, ".vetvoice")
@@ -21,8 +20,8 @@ DEFAULT_CONFIG = {
     "asr": {
         "denoise": True,
         "model":"vosk",
-        "model_funasr_path": "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
-        "model_vosk_path": "vosk/vosk-model-small-cn-0.22",
+        "model_funasr_path": ".cache/shuai1618/paraformer-zh-streaming",
+        "model_vosk_path": ".cache/shuai1618/vosk-model-small-cn",
         "device":"mps"
     },
     "process": {
@@ -31,7 +30,8 @@ DEFAULT_CONFIG = {
     },
         
     "spk": {
-        "model_pyannote_path": "pyannote/embedding",
+        "model_pyannote_path": ".cache/shuai1618/speaker-diarization",
+        "voiceprint_path": ".cache/shuai1618/wespeaker-voxceleb-resnet34-LM",
         "device":"mps"
     },
     "llm": {

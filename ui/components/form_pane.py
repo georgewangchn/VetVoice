@@ -3,14 +3,17 @@ from PySide6.QtWidgets import (
     QPushButton, QGridLayout
 )
 from PySide6.QtWidgets import QDateEdit
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Signal
 import datetime
 from loguru import logger
 from case.sql_manage import CaseManager,VedisManager
 class FormPanel(QWidget):
+    # 病例保存信号
+    case_saved = Signal(str)  # 参数为 case_id
+
     def __init__(self,llm):
         super().__init__()
-        self.llm = llm  
+        self.llm = llm
         self.setup_ui()
         self.initial_case_snapshot = self.capture_case_snapshot()
        
@@ -203,40 +206,51 @@ class FormPanel(QWidget):
             "results": self.checkup_text.toPlainText(),
             "diagnosis": self.diagnosis_text.text(),
             "treatment": self.treatment_text.toPlainText(),
-            "dialogue": str(self.llm)  
+            "dialogue": str(self.llm)
         }
         CaseManager.insert(case_data)
         self.initial_case_snapshot=self.capture_case_snapshot()
+
+        # 发射保存信号，让app层更新选择器
+        case_id = self.case_id.text()
+        self.case_saved.emit(case_id)
+        logger.info(f"已保存病历: {case_id}")
     def delete(self):
         CaseManager.delete("case_id = ?", (self.case_id.text(),))
         VedisManager.delete("current_case_id")
         self.clear()
-        self.case_selector.removeItem(self.case_selector.currentIndex())
+        if self.case_selector.currentIndex() >= 0:
+            self.case_selector.removeItem(self.case_selector.currentIndex())
         self.llm.clear()  # 清空 LLM 对话内容
     def new(self):
-        if  self.case_id.text().strip() and not self.is_case_empty():
+       
+        # 情况a: 病历内容不空且已经发生变动
+        if not self.is_case_empty() and self.is_case_modified():
+            # 保存当前病历（save方法会自动添加到选择器并发射信号）
             self.save()
-            self.case_selector.addItem(self.case_id.text().strip())
-            self.clear()
-            self.llm.clear()
-        # if not self.case_id.text().strip():
-        #    #case_id 为空，说明是第一次创建 
-        #     current_date = datetime.datetime.now().strftime("%Y%m%d")
-        #     count = len(CaseManager.get_case_by_date())
-        #     self.case_id.setText(f"{current_date}_{count+1}")
-        #     VedisManager.set("current_case_id", self.case_id.text())
-           
-        # else:
-        #     # case_id 不为空，说明是已有病例，检查是否修改
-        #     if not self.is_case_empty() :
-        #         self.save()
-        #         self.case_selector.addItem(self.case_id.text().strip())
-        #         self.clear()
-        #         self.llm.clear()
+
+        # 情况c: 手动输入的case_id也适用上述逻辑（已包含在情况a的处理中）
+
+        # 情况b: 病历内容为空 - 不做任何保存，直接进入新病历状态
+
+        # 清空所有面板
+        self.clear()
+        self.llm.clear()
+
+        # 生成新的case_id
         current_date = datetime.datetime.now().strftime("%Y%m%d")
         count = len(CaseManager.get_case_by_date())
-        self.case_id.setText(f"{current_date}_{count+1}")
-        VedisManager.set("current_case_id", self.case_id.text())
+        new_case_id = f"{current_date}_{count+1}"
+        self.case_id.setText(new_case_id)
+        VedisManager.set("current_case_id", new_case_id)
+
+        # 清空case_selector的选中状态（新病历不应选中任何历史病例）
+        self.case_selector.setCurrentIndex(-1)
+
+        # 更新快照
+        self.update_case_snapshot()
+
+        logger.info(f"创建新病历: {new_case_id}")
             
             
             

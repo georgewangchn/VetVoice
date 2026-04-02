@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QTimer,QEvent
 from loguru import logger
 import json
 import case.llm
+from pathlib import Path
 class ASRPanel(QWidget):
     def __init__(self, audio_receive,text_queue,llm_manager:case.llm.LLMManager):
         super().__init__()
@@ -16,16 +17,37 @@ class ASRPanel(QWidget):
         self.setup_ui()
         self.timer = QTimer()
         self.timer.timeout.connect(self.poll_text_queue)
-        self.timer.start(200)  
-        self.speaker_colors = {}  # 存储每个 speaker 的颜色
+        self.timer.start(200)
+        self.speaker_colors = {}
         self.default_colors = [
             "#1E90FF", "#FF4500", "#008000", "#800080", "#FF1493",
             "#2E8B57", "#8B0000", "#4682B4", "#DAA520", "#A52A2A"
         ]
+        self.user_color = "#4CAF50"  # 用户统一绿色
+        self.doctor_color = "#2196F3"  # 医生统一蓝色
         self.unknown_color = "#808080"  # unknown 统一灰色
         self.color_index = 0
-        
+
+        # 加载医生姓名
+        self.load_doctor_names()
+
         QTimer.singleShot(100, self.populate_device_list)
+
+    def load_doctor_names(self):
+        """加载已录入的医生姓名"""
+        self.doctor_names = set()
+
+        try:
+            voiceprint_dir = Path.home() / ".vetvoice" / "voiceprints"
+            metadata_file = voiceprint_dir / "metadata.json"
+
+            if metadata_file.exists():
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                self.doctor_names = set(metadata.keys())
+                logger.info(f"🏥 已加载 {len(self.doctor_names)} 个医生声纹: {', '.join(self.doctor_names)}")
+        except Exception as e:
+            logger.warning(f"加载医生姓名失败: {e}")
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -100,47 +122,71 @@ class ASRPanel(QWidget):
         try:
             while not self.text_queue.empty():
                 item = self.text_queue.get_nowait()
+
                 # 假设 item 是 JSON 字符串，如 {"speaker": "A", "text": "你好"}
                 if isinstance(item, str):
                     try:
                         data = json.loads(item)
-                        speaker = data.get("speaker", "unkonw")
+                        speaker = data.get("speaker", "用户")
                         text = data.get("text", "")
+
+                        # 标准化speaker名称
+                        if speaker.lower() in ["unknown", "unkonw"]:
+                            speaker = "用户"
+
                     except Exception:
-                        # 如果不是 JSON，就统一用 A 说话
-                        speaker = "unkonw"
+                        # 如果不是 JSON，就统一用 "用户" 说话
+                        speaker = "用户"
                         text = item
                 else:
-                    speaker = "unkonw"
+                    speaker = "用户"
                     text = str(item)
 
                 self.append_dialogue(speaker, text)
+
+                # 重新加载医生姓名（以防有更新）
+                self.load_doctor_names()
+
         except Exception as e:
             import traceback
             logger.error(traceback.format_exc())
             logger.warning(f"文本队列读取出错: {e}")
+
     def append_dialogue(self, speaker, text):
-        if speaker.lower() == "unknown" or speaker.lower() == "unkonw":
-            color = self.unknown_color
+        # 确定颜色
+        if speaker in self.doctor_names:
+            # 已注册的医生使用蓝色
+            color = self.doctor_color
+            display_name = speaker  # 使用医生真实姓名
+        elif speaker == "用户":
+            # 用户使用绿色
+            color = self.user_color
+            display_name = "用户"
         else:
-            # 新 speaker 分配一个颜色
-            if speaker not in self.speaker_colors:
-                color = self.default_colors[self.color_index % len(self.default_colors)]
-                self.speaker_colors[speaker] = color
-                self.color_index += 1
-            else:
-                color = self.speaker_colors[speaker]
+            # 其他说话人使用默认颜色
+            color = self.unknown_color
+            display_name = speaker
+
+        # 医生说话时显示额外信息
+        speaker_prefix = "🏥 " if speaker in self.doctor_names else "💬 "
+        display_name = f"{speaker_prefix}{display_name}"
+
         html = f"""
                 <div style="color:{color}; margin:1px; font-size:13px; line-height:1.1;">
-                    <b>{speaker}：</b>{text}
+                    <b>{display_name}：</b>{text}
                 </div>
                 """
         self.text_browser.append(html)
         self.text_browser.verticalScrollBar().setValue(self.text_browser.verticalScrollBar().maximum())
-        self.llm_manager.append(speaker,text)
+        self.llm_manager.append(speaker, text)
     def reset_waveform(self):
         self.wave_widget.reset_waveform()
 
     def append_text(self, html):
         self.text_browser.append(html)
         self.text_browser.verticalScrollBar().setValue(self.text_browser.verticalScrollBar().maximum())
+
+    def clear_dialogues(self):
+        """清空对话内容"""
+        self.text_browser.clear()
+        logger.info("ASR对话内容已清空")

@@ -36,7 +36,8 @@ class VoiceRecorder:
     def is_speech(self, frame):
         if len(frame) != 160:
             return False
-        return self.vad.is_speech(frame.tobytes(), 16000)    
+        return self.vad.is_speech(frame.tobytes(), 16000)
+
     def audio_callback(self, indata, frames, time, status):
         try:
             # logger.debug(f"麦克风接受frames: {frames}")
@@ -48,6 +49,62 @@ class VoiceRecorder:
             logger.warning("audio queue full, drop frame")
         except Exception as e:
             logger.error(f"audio_callback error: {e}")
+
+    def identify_speaker_from_audio(self, audio_data):
+        """
+        从音频数据中识别说话人
+
+        Args:
+            audio_data: 音频数据 (numpy array)
+
+        Returns:
+            tuple: (说话人姓名, 相似度)
+        """
+        try:
+            from voice.speaker_realtime import SpeakerRealtime, load_reference_embeddings
+            from pathlib import Path
+            from utils.resource_path import get_resource_path
+
+            # 加载声纹模型（使用 get_resource_path 转换为绝对路径）
+            model_path = str(get_resource_path(cfg.get("spk", "voiceprint_path")))
+            if not model_path:
+                return "用户", None
+
+            # 创建识别器
+            speaker_recognizer = SpeakerRealtime(model_path)
+            if speaker_recognizer.model is None:
+                logger.warning("声纹模型未加载，使用用户身份")
+                return "用户", None
+
+            # 加载参考声纹库
+            voiceprint_dir = Path.home() / ".vetvoice" / "voiceprints"
+            metadata_file = voiceprint_dir / "metadata.json"
+            reference_embeddings = load_reference_embeddings(metadata_file)
+
+            if not reference_embeddings:
+                logger.debug("没有参考声纹库，默认为用户")
+                return "用户", None
+
+            # 转换音频格式
+            if audio_data.dtype == np.int16:
+                audio_float = audio_data.astype(np.float32) / 32768.0
+            else:
+                audio_float = audio_data.astype(np.float32)
+
+            # 识别说话人
+            speaker_name, similarity = speaker_recognizer.identify_speaker(
+                audio_float,
+                reference_embeddings,
+                threshold=0.85
+            )
+
+            return speaker_name, similarity
+
+        except Exception as e:
+            logger.error(f"声纹识别过程中出错: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return "用户", None
 
     def _inner_run(self):
         bs = 160   
@@ -84,10 +141,13 @@ class VoiceRecorder:
                         silence_count = 0
                         if len(ns_chunks) * self.frame_len >= self.max_segment_len:
                             ns_block = np.concatenate(ns_chunks)
-                            self.audio_queue.put_nowait((ns_block.copy(),False))
+                            # 进行声纹识别
+                            speaker, similarity = self.identify_speaker_from_audio(ns_block)
+                            # 将说话人信息也放入队列
+                            self.audio_queue.put_nowait((ns_block.copy(), False, speaker))
                             self._save_queue.put_nowait(ns_block.copy())
                             ns_chunks.clear()
-                            logger.debug(f"语音段超长，送入queue，长度: {len(ns_block)} ")
+                            logger.debug(f"语音段超长，送入queue，长度: {len(ns_block)}，说话人: {speaker}")
                     else:
                         silence_count += 1
                         if silence_count<10:
@@ -95,20 +155,24 @@ class VoiceRecorder:
                         if silence_count<20:
                             if ns_chunks:
                                 ns_block = np.concatenate(ns_chunks)
-                                self.audio_queue.put_nowait((ns_block.copy(),False))
+                                # 进行声纹识别
+                                speaker, similarity = self.identify_speaker_from_audio(ns_block)
+                                self.audio_queue.put_nowait((ns_block.copy(), False, speaker))
                                 self._save_queue.put_nowait(ns_block.copy())
                                 ns_chunks.clear()
-                                logger.debug(f"静音<20个或者语音段超长，送入queue，长度: {len(ns_block)} ")
+                                logger.debug(f"静音<20个或者语音段超长，送入queue，长度: {len(ns_block)}，说话人: {speaker}")
                             continue
                             
                         if silence_count >= 20:
                             if ns_chunks:
                                 ns_block = np.concatenate(ns_chunks)
-                                self.audio_queue.put_nowait((ns_block.copy(),True))
+                                # 进行声纹识别
+                                speaker, similarity = self.identify_speaker_from_audio(ns_block)
+                                self.audio_queue.put_nowait((ns_block.copy(), True, speaker))
                                 self._save_queue.put_nowait(ns_block.copy())
                             else:
-                                self.audio_queue.put_nowait((ns_chunks.copy(),True))
-                            logger.debug(f"静音>=20个或者语音段超长，送入queue，长度: {len(ns_block)} ")
+                                self.audio_queue.put_nowait((ns_chunks.copy(), True, "用户"))
+                            logger.debug(f"静音>=20个或者语音段超长，送入queue，长度: {len(ns_block)}，说话人: {speaker if 'speaker' in locals() else '用户'}")
                             ns_chunks.clear()
                             silence_count = 0
                                 
@@ -120,6 +184,12 @@ class VoiceRecorder:
                 logger.error(f"Error in audio processing: {e}")
     def _save_run(self):
         buff = np.array([], dtype=np.int16)
+        save_dir = cfg.get("app", "save_dir")
+
+        # 如果没有设置save_dir，不保存音频文件
+        if not save_dir:
+            logger.warning("未设置保存路径，跳过音频文件保存")
+
         while not self._save_stop_event.is_set():
             try:
                 block = self._save_queue.get(timeout=0.1)
@@ -131,14 +201,21 @@ class VoiceRecorder:
             buff = np.concatenate([buff, block])
             if len(buff) < 480000:
                 continue
+
+            # 只有在设置了save_dir的情况下才保存文件
+            if not save_dir:
+                logger.info(f"跳过保存音频数据（长度: {len(buff)} samples）")
+                buff = np.array([], dtype=np.int16)
+                continue
+
             from case.sql_manage import VedisManager
-            
+
             case_id=VedisManager.get("current_case_id")
             now_str = datetime.datetime.now().strftime("%H%M%S")
-            
+
             import os
-            os.makedirs(os.path.join(cfg.get("app", "save_dir"), "wav"), exist_ok=True)
-            filepath = os.path.join(cfg.get("app", "save_dir"), f"wav/{case_id}_{now_str}.wav")
+            os.makedirs(os.path.join(save_dir, "wav"), exist_ok=True)
+            filepath = os.path.join(save_dir, f"wav/{case_id}_{now_str}.wav")
             with wave.open(filepath, 'wb') as wf:
                 wf.setnchannels(1)
                 wf.setsampwidth(np.dtype('int16').itemsize)

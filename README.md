@@ -22,6 +22,7 @@
 | 实时语音识别                | 开始agent                | 对话填充电子病历                |
 
 # 🎉 新闻
+- [X] [2026.04.02]🎯📢 模型自动下载。
 - [X] [2025.09.10]🎯📢 支持agent/mcp智能体，智能整理电子病历4个阶段：问诊阶段 / 开检查阶段 / 查看检查结果阶段 / 确诊治疗阶段。
 - [X] [2025.08.26]🎊🔥 基于Python3.10版发布🔥🎊
 # 简介
@@ -58,31 +59,116 @@
 
 # 下载
 
- > ​通过网盘分享的文件：resources.zip
+**模型自动下载**（推荐）
+- 系统首次启动时会自动下载所需模型文件，无需手动下载
+- 支持断点续传，下载过程中可随时暂停和恢复
+- 模型文件将自动保存在程序指定的资源目录中
 
- >​ 链接: https://pan.baidu.com/s/1arQO6OBExGB3xlq4zykvvw?pwd=6847 提取码: 6847
-
- >​ 下载解压到本地，如：/data/resources
-
- >​ 在登陆页面设置资源路径：/data/resources
+**手动下载（可选）**
+``` bash
+pip install modelscope
+modelscope download --model shuai1618/wespeaker-voxceleb-resnet34-LM
+modelscope download --model shuai1618/paraformer-zh-streaming
+```
 
 # 使用
-  Python3.10环境启动(推荐3.10，Pyside6对高版本Python支持不友好)
-``` bash
+
+## 环境要求
+- **Python 3.10**（推荐3.10，Pyside6对高版本Python支持不友好）
+- 支持系统：Windows / macOS / Linux
+- 硬件要求：建议至少4GB内存用于模型加载
+
+## 安装步骤
+
+### 1. 克隆代码仓库
+```bash
 git clone https://github.com/georgewangchn/VetVoice.git
 cd VetVoice
+```
+
+### 2. 创建Python环境
+```bash
 uv venv --python=3.10
 source .venv/bin/activate
+```
+
+### 3. 安装依赖
+```bash
 uv pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cpu
-uv sync # or uv pip install -r requirements.txt
+uv sync
+# 或者使用传统方式：uv pip install -r requirements.txt
+```
+
+### 4. 启动程序
+```bash
 python main.py
 ```
+
 ## 窗口程序使用步骤
-  - 注册
-  - 登陆（用户名、密码、资源路径、保存路径）
-  - 设置 大模型openai形式接口参数）
-  - 重启
-  - 开始使用
+
+### 首次使用配置
+
+#### 1. 用户注册
+- 启动程序后进入注册页面
+- 填写用户名和密码完成注册
+
+#### 2. 登录设置
+- 使用注册的账号登录
+- **资源路径设置**：指定模型文件保存目录（建议选择有足够空间的磁盘）
+- **保存路径设置**：指定录制的音频和导出病历的保存目录
+
+#### 3. 模型自动下载
+- 系统首次启动时会自动检测所需模型
+- 如发现模型不存在，会自动开始下载过程
+- **支持的模型**：
+  - 语音识别模型（paraformer-zh-streaming）
+  - 说话人识别模型（wespeaker-voxceleb-resnet34-LM）
+- 下载过程支持断点续传，可随时暂停和恢复
+- 下载完成后模型自动保存到指定的资源路径
+
+#### 4. 大模型参数设置
+- 进入参数页面配置LLM接口
+- **支持格式**：OpenAI兼容API格式
+- **必需参数**：
+  - API地址（如：https://api.openai.com/v1）
+  - API密钥（填写相应的服务密钥）
+- **可选参数**：
+  - 模型名称（如：gpt-4, gpt-3.5-turbo等）
+  - 温度参数（控制生成随机性）
+
+#### 5. 重启程序
+- 配置完成后需重启程序使设置生效
+- 模型下载完成后重启即可开始使用
+
+### 日常使用流程
+
+#### 开始诊疗
+1. 登录系统
+2. 点击"开始录音"按钮
+3. 对话过程中系统实时：
+   - 语音降噪处理
+   - 语音转文字
+   - 自动识别说话人（医生/宠主）
+4. 点击"停止录音"结束
+
+#### 辅助诊断
+1. 点击"开始agent"启动AI辅助
+2. 系统智能整理电子病历，支持4个阶段：
+   - 问诊阶段
+   - 开检查阶段
+   - 查看检查结果阶段
+   - 确诊治疗阶段
+3. AI根据对话内容自动填充病历结构化信息
+
+#### 导出保存
+1. 查看/编辑生成的病历内容
+2. 点击导出按钮保存为PDF格式
+3. 原始录音文件自动保存为WAV格式
+
+## 注意事项
+- 首次启动模型下载需要稳定网络环境
+- 建议使用全向会议麦克风以获得最佳降噪效果
+- 大模型调用消耗API调用次数，请根据实际需求配置
 # TODO计划
   - pyinstaller打包windows/ubuntu/macos平台安装包
   - 开放http/mcp控制接口：当前病例号/开始录音/停止录音/辅诊/检查确诊/推荐用药/电子病历等

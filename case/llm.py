@@ -40,7 +40,7 @@ class LLMManager(QObject):
 
         if not BASE_URL or not MODEL:
                 self.stream_signal.emit(tab_name, "<<START>>")
-                self.stream_signal.emit(tab_name, "未配置LLM，请进入【设置】【全局】【大模型】配置\n")
+                self.stream_signal.emit(tab_name, "未配置LLM，请进入【设置】【参数】【大模型】配置\n")
                 self.stream_signal.emit(tab_name, "<<END>>")
                 return
         content ='\n'.join([ str(tup)  for tup in self.asr_speaker_lst]) 

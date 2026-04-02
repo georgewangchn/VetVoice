@@ -43,6 +43,9 @@ class VoiceApp(QWidget):
         self.bt_panel= ui.components.bt_panel.BTPanel()
         self.asr_panel=ui.components.asr_panel.ASRPanel(self.audio_receive,self.text_queue,self.llm_manager)
         self.llm_panel = ui.components.llm_panel.LLMPanel(self.llm_manager,self.form_panel)
+
+        # 连接病历保存信号
+        self.form_panel.case_saved.connect(self.on_case_saved)
         
         asr_layout = QVBoxLayout()
         asr_layout.addWidget(self.bt_panel)        
@@ -91,8 +94,11 @@ class VoiceApp(QWidget):
 
         # 设置菜单
         settings_menu = menu_bar.addMenu("设置")
-        action_settings = settings_menu.addAction("全局")
+        action_settings = settings_menu.addAction("参数")
         action_settings.triggered.connect(self.open_settings_dialog)
+
+        action_voiceprint = settings_menu.addAction("声纹")
+        action_voiceprint.triggered.connect(self.open_voiceprint_dialog)
 
         # 关于菜单
         about_menu = menu_bar.addMenu("帮助")
@@ -141,6 +147,8 @@ class VoiceApp(QWidget):
         if case_id in self.form_panel.case_selector.currentText():
             self.form_panel.case_selector.removeItem(self.form_panel.case_selector.currentIndex())
         self.form_panel.delete()
+        # 清空ASR对话内容
+        self.asr_panel.clear_dialogues()
     def case_selected(self, index):
         if index < 0:
             return
@@ -155,6 +163,8 @@ class VoiceApp(QWidget):
         
     def case_input(self):
         self.form_panel.new()
+        # 清空ASR对话内容
+        self.asr_panel.clear_dialogues()
 
     def start_recording(self):
         if not self.form_panel.case_id.text().strip():
@@ -194,6 +204,28 @@ class VoiceApp(QWidget):
         self.form_panel.case_selector.setEnabled(True)
         self.form_panel.new_case.setEnabled(True)
         self.form_panel.del_case.setEnabled(True)
+
+    def on_case_saved(self, case_id):
+        """病历保存后的回调"""
+        # 重新加载当日病历列表
+        date_str = self.form_panel.date_edit.date().toString("yyyyMMdd")
+        cases = case.sql_manage.CaseManager.get_case_by_date(date_str)
+
+        # 保存当前选择
+        current_selection = self.form_panel.case_selector.currentText()
+
+        # 更新选择器
+        self.form_panel.case_selector.clear()
+        self.form_panel.case_selector.addItems(cases)
+
+        # 尝试恢复选择
+        for i in range(self.form_panel.case_selector.count()):
+            if self.form_panel.case_selector.itemText(i) == current_selection:
+                self.form_panel.case_selector.setCurrentIndex(i)
+                break
+
+        logger.info(f"病历保存后更新了选择器，当前病历: {case_id}")
+
     def save2pdf(self):
         
         os.makedirs(cfg.get("app", "save_dir"), exist_ok=False)
@@ -205,6 +237,7 @@ class VoiceApp(QWidget):
         dialog = ui.components.set_panel.SettingsDialog(self)
         dialog.exec()
         self.llm_panel.setup_ui()
+
     def show_about_dialog(self):
         QMessageBox.information(
             self,
@@ -212,5 +245,10 @@ class VoiceApp(QWidget):
             "VetVoice 兽医声动\n智能语音电子病历系统\n版本 1.0.0",
             "https://github.com/georgewangchn/VetVoice",
             "联系方式 aigeorge@qq.com"
-            
         )
+
+    def open_voiceprint_dialog(self):
+        """打开声纹管理对话框"""
+        from ui.components.voiceprint_panel import VoiceprintPanel
+        dialog = VoiceprintPanel(self)
+        dialog.exec()
