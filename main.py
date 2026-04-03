@@ -1,5 +1,9 @@
+import torch
+from torch.serialization import add_safe_globals
+from torch.torch_version import TorchVersion
+
+add_safe_globals([TorchVersion])
 import sys
-import warnings
 import warnings
 
 warnings.filterwarnings(
@@ -13,9 +17,14 @@ warnings.filterwarnings(
 
 import os
 import time
-from multiprocessing import Process, Queue, Event, set_start_method, RawArray, Pipe, freeze_support
+from multiprocessing import Process, Queue, set_start_method, freeze_support
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QIcon  # 加在顶部
+from PySide6.QtGui import QIcon
+
+# Disable torch distributed module loading to prevent crashes in pyinstaller builds
+os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '0'
+os.environ['PYTORCH_NO_CUDA_MEMORY_CACHING'] = '1'
+
 import voice.recorder as recorder
 import voice.asr as asr
 from ui.app import VoiceApp
@@ -28,6 +37,11 @@ from case.sql_manage import init_db
 import asyncio
 from qasync import QEventLoop
 import ui.cs
+
+# Prevent torch distributed from loading (causes crashes in packaged apps)
+import torch
+if hasattr(torch, 'distributed'):
+    torch.distributed.is_available = lambda: False
 
 def start_process(name, target, kwargs):
     p = Process(target=target, args=(kwargs,), name=name)
@@ -62,7 +76,7 @@ if __name__ == "__main__":
     freeze_support()
     set_start_method("spawn")
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon("app.ico"))
+    app.setWindowIcon(QIcon("img/app.ico"))
    
     home =  Path.home()
     vetvoice_folder = os.path.join(home, ".vetvoice")
@@ -129,21 +143,23 @@ if __name__ == "__main__":
     
     # 初始化多进程通信组件
 
+    # 控制队列：主进程 -> 子进程 发送控制命令
+    control_queue = Queue(maxsize=10)
+    # 音频队列：Recorder -> ASR 传输音频数据
     audio_queue = Queue(maxsize=cfg.get("process", "audio_queue_size"))
+    # 文本队列：ASR -> 主进程 传输识别结果
     text_queue = Queue(maxsize=cfg.get("process", "text_queue_size"))
-    start_event = Event()
-    stop_event = Event()
-    current_case_id = RawArray('c', 64) 
-    start_event.clear()
-    stop_event.clear()
-    audio_send, audio_receive = Pipe()
+
+    # 波形显示：Recorder -> UI 传输实时波形数据
+    from multiprocessing import Pipe
+    audio_receive, audio_send = Pipe(duplex=False)
+
     kwargs = {
-        'start_event': start_event,
-        'stop_event': stop_event,
+        'control_queue': control_queue,
         'audio_queue': audio_queue,
         'text_queue': text_queue,
         'audio_send': audio_send,
-        'audio_receive': audio_receive
+        'audio_receive': audio_receive,
     }
 
     procs = {}

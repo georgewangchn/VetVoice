@@ -3,13 +3,18 @@
 实时声纹识别器
 使用 wespeaker-voxceleb-resnet34-LM 模型进行实时声纹识别
 """
+import torch
+from torch.serialization import add_safe_globals
+from torch.torch_version import TorchVersion
+
+add_safe_globals([TorchVersion])
 import os
 import json
 import numpy as np
 from pathlib import Path
 from loguru import logger
 
-
+from settings import cfg
 class SpeakerRealtime:
     """实时声纹识别器"""
 
@@ -47,7 +52,8 @@ class SpeakerRealtime:
 
             if model_file.exists():
                 logger.info(f"加载声纹模型: {model_file}")
-                model = torch.load(model_file, map_location='cpu')
+                device = cfg.get("spk", "device", "cpu")
+                model = torch.load(model_file, map_location=device,weights_only=False)
                 model.eval()
                 return model
             else:
@@ -57,7 +63,8 @@ class SpeakerRealtime:
                     potential_file = self.model_path / fname
                     if potential_file.exists():
                         logger.info(f"加载声纹模型: {potential_file}")
-                        model = torch.load(potential_file, map_location='cpu')
+                        device = cfg.get("spk", "device", "cpu")
+                        model = torch.load(potential_file, map_location=device,weights_only=False)
                         if hasattr(model, 'eval'):
                             model.eval()
                         return model

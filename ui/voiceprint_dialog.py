@@ -428,7 +428,7 @@ class VoiceprintDialog(QDialog):
 
             # 加载模型
             device = cfg.get("spk", "device", "cpu")
-            checkpoint = torch.load(model_file, map_location=device)
+            checkpoint = torch.load(model_file, map_location=device,weights_only=False)
             model = checkpoint['model'] if 'model' in checkpoint else checkpoint
             model.eval()
 

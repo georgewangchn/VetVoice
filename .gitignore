@@ -131,3 +131,4 @@ CLAUDE.md
 *.sh
 *.plist
 *.spec
+venv312/

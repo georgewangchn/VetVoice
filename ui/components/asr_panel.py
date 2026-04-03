@@ -9,7 +9,7 @@ import json
 import case.llm
 from pathlib import Path
 class ASRPanel(QWidget):
-    def __init__(self, audio_receive,text_queue,llm_manager:case.llm.LLMManager):
+    def __init__(self, text_queue, llm_manager:case.llm.LLMManager, audio_receive=None):
         super().__init__()
         self.audio_receive = audio_receive
         self.text_queue = text_queue
@@ -52,11 +52,15 @@ class ASRPanel(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout()
 
-        # 波形图
-        self.wave_widget = WaveformWidget(self.audio_receive)
-        self.wave_widget.setFixedSize(200, 40)
-        self.wave_widget.setStyleSheet("background-color: #1e1e1e;")
-        self.wave_widget.setContentsMargins(0, 0, 0, 0)
+        # 波形图 - 恢复实时波形显示
+        if self.audio_receive:
+            self.wave_widget = WaveformWidget(self.audio_receive)
+            self.wave_widget.setFixedSize(200, 40)
+        else:
+            self.wave_widget = None
+            placeholder = QWidget()
+            placeholder.setFixedSize(200, 40)
+            placeholder.setStyleSheet("background-color: #1e1e1e; border: 1px solid #333;")
 
         # 输入输出设备下拉框
         device_widget = QWidget()
@@ -67,8 +71,6 @@ class ASRPanel(QWidget):
         self.output_device = QComboBox()
         device_layout.addWidget(QLabel("音频输入"))
         device_layout.addWidget(self.input_device)
-        # device_layout.addStretch(1)  # 让设备选择控件贴顶，下面空开
-        # device_layout.addWidget(self.output_device)
         device_widget.setLayout(device_layout)
 
         # 合并波形图 + 设备选择
@@ -77,7 +79,10 @@ class ASRPanel(QWidget):
         view_layout = QHBoxLayout()
         view_layout.setAlignment(Qt.AlignVCenter)
         view_layout.setContentsMargins(0, 0, 0, 0)
-        view_layout.addWidget(self.wave_widget)
+        if self.wave_widget:
+            view_layout.addWidget(self.wave_widget)
+        else:
+            view_layout.addWidget(placeholder)
         view_layout.addWidget(device_widget)
         view_widget.setLayout(view_layout)
 
@@ -180,7 +185,8 @@ class ASRPanel(QWidget):
         self.text_browser.verticalScrollBar().setValue(self.text_browser.verticalScrollBar().maximum())
         self.llm_manager.append(speaker, text)
     def reset_waveform(self):
-        self.wave_widget.reset_waveform()
+        if self.wave_widget:
+            self.wave_widget.reset_waveform()
 
     def append_text(self, html):
         self.text_browser.append(html)

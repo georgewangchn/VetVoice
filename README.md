@@ -1,10 +1,17 @@
-# 🩺 ​​VetVoice | 兽医声动
-
 <div align="center">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; padding: 25px; text-align: center;">
-    <p style="font-size: 48px;" >兽医声动，诊疗更高效</p>
-  </div>
-</div>
+
+# 🩺 VetVoice — 兽医声动
+
+### 🎙️ 让兽医 **只需说话**，AI 自动完成电子病历
+
+实时语音识别 · 多人对话分离 · AI 辅助诊疗 · 自动生成病例
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3.10-blue">
+  <img src="https://img.shields.io/badge/PySide6-GUI-green">
+  <img src="https://img.shields.io/badge/FunASR-Realtime-orange">
+  <img src="https://img.shields.io/badge/LLM-Agent-purple">
+</p>
 
 </div>
 
@@ -12,86 +19,99 @@
   <img src="https://user-images.githubusercontent.com/74038190/212284100-561aa473-3905-4a80-b561-0d28506553ee.gif" width="800">
 </div>
 
+> VetVoice 是一个面向宠物医院的 AI 语音病历助手，将 **诊疗对话实时转换为结构化电子病历**。
 
-# 展示
+---
 
-## agent智能填充
+## 🤔 为什么需要 VetVoice？
+
+传统宠物诊疗存在：
+
+- ✍️ 手写病历耗时
+- 🧠 医生边问边记录负担大
+- 📄 病历结构不统一
+- ⏱️ 接诊效率低
+
+VetVoice 让医生：
+
+✅ 只需专注沟通
+✅ AI 自动记录
+✅ 自动生成标准病历
+
+---
+
+## 🚀 核心能力
+
+### 🎧 实时语音理解
+- WebRTC 实时降噪
+- 长语音连续识别
+- 嘈杂诊室高准确率
+
+### 👥 多说话人自动识别
+- 自动区分医生 / 宠主
+- 彩色对话显示
+- 多人场景支持
+
+### 🧠 AI 智能诊疗 Agent
+
+自动完成：
+
+1️⃣ 问诊整理
+2️⃣ 检查建议
+3️⃣ 结果分析
+4️⃣ 诊断与治疗生成
+
+### 📄 一键生成医疗文档
+- PDF 病历导出
+- WAV 原始录音保存
+
+---
+
+## 🧩 技术架构
+
+```
+麦克风
+   ↓
+WebRTC APM（降噪）
+   ↓
+FunASR Streaming ASR
+   ↓
+Speaker Diarization
+   ↓
+LLM Agent (MCP)
+   ↓
+结构化电子病历
+```
+
+---
+
+## ⚡ Quick Start（3分钟运行）
+
+```bash
+git clone https://github.com/georgewangchn/VetVoice.git
+cd VetVoice
+python3.12 -v venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+---
+
+## 📺 Demo 展示
 
 | ![图片1](img/1.png) | ![图片2](img/2.png) | ![图片3](img/3.png) |
 |----------------------|----------------------|----------------------|
 | 实时语音识别                | 开始agent                | 对话填充电子病历                |
 
-# 🎉 新闻
-- [X] [2026.04.02]🎯📢 模型自动下载。
-- [X] [2025.09.10]🎯📢 支持agent/mcp智能体，智能整理电子病历4个阶段：问诊阶段 / 开检查阶段 / 查看检查结果阶段 / 确诊治疗阶段。
-- [X] [2025.08.26]🎊🔥 基于Python3.10版发布🔥🎊
-# 简介
-  VetVoice（兽医声动）​​ 是基于 ​PySide6 + FunASR + LLM​ 的智能语音病历系统跨平台【插件】，搭配【全向会议麦克风】，成为宠物医疗病例强力助手。支持：
+---
 
-  - 实时语音降噪
-  - 实时语音转文字（中英文）
-  - 自动区分医生/宠主对话
-  - 大模型辅助生成病例、诊断建议
-  - 一键导出PDF/WAV
-  - 适用于宠物医院、兽医诊所等场景，解决手写病历效率低下的痛点。
-  - 开放http/mcp_server可方便集成
+## 📖 详细使用说明
 
-
-# 核心功能
-## 实时语音降噪
-  - 基于 Webrtc实时降噪（配合全向会议麦克风最佳）
-## 实时语音识别
-  - 基于 [FunASR](https://github.com/modelscope/FunASR) / [Vosk](https://github.com/alphacep/vosk-api)，支持长语音断句和静音检测
-  - 自适应降噪，提升嘈杂环境下的识别准确率
-## 实时说话人分离
-  - 自动标记医生与宠主对话（不同颜色/对齐方式）
-  - 支持多人对话场景
-## 实时大模型辅助诊疗
-
-  - ​病例生成​：语音输入→结构化病历（主诉、现病史等）
-  - ​辅助诊断​：大模型分析对话，提供鉴别诊断建议
-  - ​用药指导​：自动生成用法用量（需接入大模型API）
-
-## 一键导出
-
-  - 保存原始音频文件（WAV格式）,批量导出PDF病历
-
-
-# 下载
-
-**模型自动下载**（推荐）
-- 系统首次启动时会自动下载所需模型文件，无需手动下载
-- 支持断点续传，下载过程中可随时暂停和恢复
-- 模型文件将自动保存在程序指定的资源目录中
-
-**手动下载（可选）**
-``` bash
-pip install modelscope
-modelscope download --model shuai1618/wespeaker-voxceleb-resnet34-LM
-modelscope download --model shuai1618/paraformer-zh-streaming
-```
-
-# 使用
-
-## 环境要求
-- **Python 3.10**（推荐3.10，Pyside6对高版本Python支持不友好）
+### 环境要求
+- **Python 3.12**（推荐3.10～3.12）
 - 支持系统：Windows / macOS / Linux
 - 硬件要求：建议至少4GB内存用于模型加载
-
-## 安装步骤
-
-### 1. 克隆代码仓库
-```bash
-git clone https://github.com/georgewangchn/VetVoice.git
-cd VetVoice
-```
-
-### 2. 启动程序
-```bash
-python main.py
-```
-
-## 窗口程序使用步骤
 
 ### 首次使用配置
 
@@ -152,34 +172,68 @@ python main.py
 2. 点击导出按钮保存为PDF格式
 3. 原始录音文件自动保存为WAV格式
 
-## 注意事项
+### 注意事项
 - 首次启动模型下载需要稳定网络环境
 - 建议使用全向会议麦克风以获得最佳降噪效果
 - 大模型调用消耗API调用次数，请根据实际需求配置
-# TODO计划
-  - pyinstaller打包windows/ubuntu/macos平台安装包
-  - 开放http/mcp控制接口：当前病例号/开始录音/停止录音/辅诊/检查确诊/推荐用药/电子病历等
-  - [x] 采用fastmcp开发对话mcp，电子病历流程从人控制转向agent控制（开发测试使用模型：gpt-5-nano）
-  - 推荐用户分享样本训练模型提升效果
-  - 性能优化
 
-# 致谢
-  感谢以下优秀开源项目的支持：
+---
 
-  - [FunASR](https://github.com/modelscope/FunASR)
+## 🎉 新闻
+- [X] [2026.04.02]🎯📢 模型自动下载，升级Python3.12版本，升级Torch2.11.0。
+- [X] [2025.09.10]🎯📢 支持agent/mcp智能体，智能整理电子病历4个阶段：问诊阶段 / 开检查阶段 / 查看检查结果阶段 / 确诊治疗阶段。
+- [X] [2025.08.26]🎊🔥 基于Python3.10版发布🔥🎊
 
-  - [pyannote-audio](https://github.com/pyannote/pyannote-audio)
+---
 
-  - [py-xiaozhi](https://github.com/huangjunsen0406/py-xiaozhi)
+## 🗺️ Roadmap
+- [ ] pyinstaller打包windows/ubuntu/macos平台安装包
+- [ ] 开放http/mcp控制接口：当前病例号/开始录音/停止录音/辅诊/检查确诊/推荐用药/电子病历等
+- [x] 采用fastmcp开发对话mcp，电子病历流程从人控制转向agent控制（开发测试使用模型：gpt-5-nano）
+- [ ] 推荐用户分享样本训练模型提升效果
+- [ ] 性能优化
 
+---
 
+## 💡 技术亮点
 
-# Apache License 2.0
-  [LICENSE](LICENSE)
+**AI Medical Agent** + **Realtime Speech** + **MCP**
 
-  VetVoice 还包含多种第三方组件及从其他代码库修改而来的部分代码（这些内容遵循其他开源许可证）。
-  预训练模型的使用需遵守相应模型的许可证要求。
+VetVoice 结合了实时语音识别与 AI Agent 技术，实现医疗场景下的智能辅助决策与自动化病历生成。
 
-## Star History
+- **Real-time Speech to Text**: 基于 FunASR 的流式 ASR，支持长语音实时识别
+- **Speaker Diarization**: 自动区分医生与宠主对话
+- **LLM Agent Workflow**: MCP 协议驱动的多阶段医疗流程（问诊→检查→结果→治疗）
+- **Medical Structuring**: 将非结构化诊疗对话转换为标准化电子病历
 
-[![Star History Chart](https://api.star-history.com/svg?repos=georgewangchn/VetVoice.git&type=Date)](https://www.star-history.com/#georgewangchn/VetVoice.git&Date)
+---
+
+## 🙏 致谢
+
+感谢以下优秀开源项目的支持：
+
+- [FunASR](https://github.com/modelscope/FunASR)
+- [pyannote-audio](https://github.com/pyannote/pyannote-audio)
+- [py-xiaozhi](https://github.com/huangjunsen0406/py-xiaozhi)
+
+---
+
+## 📄 License
+
+[Apache License 2.0](LICENSE)
+
+VetVoice 还包含多种第三方组件及从其他代码库修改而来的部分代码（这些内容遵循其他开源许可证）。
+预训练模型的使用需遵守相应模型的许可证要求。
+
+---
+
+<div align="center">
+
+## ⭐ Star History
+
+如果这个项目对你有帮助，请点一个 Star ⭐
+
+[![Star History Chart](https://api.star-history.com/svg?repos=georgewangchn/VetVoice&type=Date)](https://www.star-history.com/#georgewangchn/VetVoice&Date)
+
+**Keywords**: AI Medical Agent · Realtime Clinical Documentation · Veterinary AI Assistant
+</div>

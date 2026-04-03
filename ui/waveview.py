@@ -32,6 +32,8 @@ class WaveformWidget(QWidget):
                     data = self.audio_receive.recv()
                     if isinstance(data, np.ndarray) and data.dtype == np.int16:
                         self.latest = data.copy()
+                        # 重置 decay_frame 以匹配新数据的长度
+                        self.decay_frame = np.zeros(len(self.latest), dtype=np.float32)
             except Exception as e:
                 logger.warning(f"[WaveformWidget] 音频接收线程异常: {e}")
 

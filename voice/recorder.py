@@ -27,24 +27,39 @@ class VoiceRecorder:
         self.vad = webrtcvad.Vad(1)
         self.frame_len = 160  # 10ms @ 16kHz
         self.max_segment_len = 16000 * 1  # 15秒
-        
+
         #保存30s的wav文件
         self._save_queue = queue.Queue(maxsize=300)
-        self._save_thread = None 
+        self._save_thread = None
         self._save_stop_event= threading.Event()
+
+        # 声纹识别器（单例模式，仅加载一次）
+        self._speaker_recognizer = None
+        self._reference_embeddings = None
+        self._init_speaker_recognizer()
        
     def is_speech(self, frame):
         if len(frame) != 160:
             return False
         return self.vad.is_speech(frame.tobytes(), 16000)
 
+    def _init_speaker_recognizer(self):
+        """初始化声纹识别器（仅一次）"""
+        try:
+            model_path = cfg.get("spk", "voiceprint_path")
+            if model_path:
+                from utils.resource_path import get_resource_path
+                model_path = str(get_resource_path(model_path))
+                from voice.speaker_realtime import SpeakerRealtime
+                self._speaker_recognizer = SpeakerRealtime(model_path)
+        except Exception as e:
+            logger.error(f"初始化声纹识别器失败: {e}")
+            self._speaker_recognizer = None
+
     def audio_callback(self, indata, frames, time, status):
         try:
-            # logger.debug(f"麦克风接受frames: {frames}")
             mic_int16 = indata[:, 0].copy()
             self._inner_queue.put_nowait(mic_int16)
-            if not self.audio_send.poll():
-                    self.audio_send.send(mic_int16.copy())
         except queue.Full:
             logger.warning("audio queue full, drop frame")
         except Exception as e:
@@ -61,27 +76,20 @@ class VoiceRecorder:
             tuple: (说话人姓名, 相似度)
         """
         try:
-            from voice.speaker_realtime import SpeakerRealtime, load_reference_embeddings
+            from voice.speaker_realtime import load_reference_embeddings
             from pathlib import Path
-            from utils.resource_path import get_resource_path
 
-            # 加载声纹模型（使用 get_resource_path 转换为绝对路径）
-            model_path = str(get_resource_path(cfg.get("spk", "voiceprint_path")))
-            if not model_path:
+            # 使用已初始化的识别器，不再重复创建
+            if self._speaker_recognizer is None or self._speaker_recognizer.model is None:
                 return "用户", None
 
-            # 创建识别器
-            speaker_recognizer = SpeakerRealtime(model_path)
-            if speaker_recognizer.model is None:
-                logger.warning("声纹模型未加载，使用用户身份")
-                return "用户", None
+            # 加载参考声纹库（仅在首次调用时）
+            if self._reference_embeddings is None:
+                voiceprint_dir = Path.home() / ".vetvoice" / "voiceprints"
+                metadata_file = voiceprint_dir / "metadata.json"
+                self._reference_embeddings = load_reference_embeddings(metadata_file)
 
-            # 加载参考声纹库
-            voiceprint_dir = Path.home() / ".vetvoice" / "voiceprints"
-            metadata_file = voiceprint_dir / "metadata.json"
-            reference_embeddings = load_reference_embeddings(metadata_file)
-
-            if not reference_embeddings:
+            if not self._reference_embeddings:
                 logger.debug("没有参考声纹库，默认为用户")
                 return "用户", None
 
@@ -92,9 +100,9 @@ class VoiceRecorder:
                 audio_float = audio_data.astype(np.float32)
 
             # 识别说话人
-            speaker_name, similarity = speaker_recognizer.identify_speaker(
+            speaker_name, similarity = self._speaker_recognizer.identify_speaker(
                 audio_float,
-                reference_embeddings,
+                self._reference_embeddings,
                 threshold=0.85
             )
 
@@ -148,6 +156,12 @@ class VoiceRecorder:
                             self._save_queue.put_nowait(ns_block.copy())
                             ns_chunks.clear()
                             logger.debug(f"语音段超长，送入queue，长度: {len(ns_block)}，说话人: {speaker}")
+                            # 发送波形数据到UI
+                            if self.audio_send:
+                                try:
+                                    self.audio_send.send(ns_block.copy())
+                                except (BrokenPipeError, OSError):
+                                    pass
                     else:
                         silence_count += 1
                         if silence_count<10:
@@ -161,6 +175,12 @@ class VoiceRecorder:
                                 self._save_queue.put_nowait(ns_block.copy())
                                 ns_chunks.clear()
                                 logger.debug(f"静音<20个或者语音段超长，送入queue，长度: {len(ns_block)}，说话人: {speaker}")
+                                # 发送波形数据到UI
+                                if self.audio_send:
+                                    try:
+                                        self.audio_send.send(ns_block.copy())
+                                    except (BrokenPipeError, OSError):
+                                        pass
                             continue
                             
                         if silence_count >= 20:
@@ -175,6 +195,12 @@ class VoiceRecorder:
                             logger.debug(f"静音>=20个或者语音段超长，送入queue，长度: {len(ns_block)}，说话人: {speaker if 'speaker' in locals() else '用户'}")
                             ns_chunks.clear()
                             silence_count = 0
+                            # 发送波形数据到UI（静音时也发送空数据让UI知道没有声音）
+                            if self.audio_send:
+                                try:
+                                    self.audio_send.send(np.array([], dtype=np.int16))
+                                except (BrokenPipeError, OSError):
+                                    pass
                                 
             except (BrokenPipeError, EOFError) as e:
                 logger.warning(f"audio_send failed: {e}")
@@ -258,41 +284,37 @@ class VoiceRecorder:
             logger.info("音频处理线程已退出")
 
 def run(kwargs):
-    """多进程录音主入口，可被循环控制"""
     from utils.loger_util import init_subprocess_logger
     import os
     init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"recorder")
-    start_event = kwargs['start_event']
-    stop_event = kwargs['stop_event']
+    control_queue = kwargs['control_queue']
     audio_queue: Queue = kwargs['audio_queue']
-    audio_send = kwargs['audio_send']
+    audio_send = kwargs.get('audio_send', None)
 
-    recorder = VoiceRecorder(audio_queue,audio_send)
+    recorder = VoiceRecorder(audio_queue, audio_send)
 
-    logger.info("🎙️ Recorder 进程初始化完成，等待启动指令...")
-
+    logger.info("🎙️ Recorder 进程初始化完成，等待控制命令...")
     
     while True:
         try:
-            logger.info("🕒 等待 start_event...")
-            start_event.wait()
-            logger.info("📢 接收到 start_event，start_event 状态: %s", start_event.is_set())
-            recorder.start()
-
-            logger.info("🕒 等待 stop_event...")
-            stop_event.wait()
-            logger.info("📴 接收到 stop_event，stop_event 状态: %s", stop_event.is_set())
-            recorder.stop()
-
-            # ⭐️ 清除事件，避免循环逻辑异常
-            stop_event.clear()
-            start_event.clear()
-            logger.info("✅ 事件已重置，等待下一次 start_event...")
+            cmd = control_queue.get()
+            logger.info(f"📥 收到命令: {cmd}")
+            
+            if cmd == 'start':
+                recorder.start()
+                logger.info("✅ 录音已启动")
+            elif cmd == 'stop':
+                recorder.stop()
+                logger.info("✅ 录音已停止")
+            elif cmd == 'exit':
+                logger.info("🛑 收到退出命令，Recorder 进程即将退出")
+                break
+            else:
+                logger.warning(f"⚠️ 未知命令: {cmd}")
 
         except Exception as e:
             logger.info("🧹 Recorder 进程报错，清理资源"+str(e))
             try:
                 recorder.stop()
-
             except Exception as e2:
                 logger.error(f"清理资源失败: {e2}")

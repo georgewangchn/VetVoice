@@ -22,14 +22,13 @@ class VoiceApp(QWidget):
     def __init__(self,kwargs):
         super().__init__()
         self.setWindowTitle("VetVoice-兽医声动|智能语音电子病历")
-        self.setWindowIcon(QIcon("app.ico"))
+        self.setWindowIcon(QIcon("img/app.ico"))
         self.resize(1400, 900)
-        #
-        self.start_event = kwargs['start_event']
-        self.stop_event = kwargs['stop_event']
+        self.control_queue = kwargs['control_queue']
         self.audio_queue = kwargs['audio_queue']
         self.text_queue = kwargs['text_queue']
-        self.audio_receive= kwargs['audio_receive']
+        self.audio_receive = kwargs.get('audio_receive', None)
+        self._is_recording = False
         self.llm_manager = case.llm.LLMManager()
         #ui
         self.setup_ui()
@@ -41,7 +40,7 @@ class VoiceApp(QWidget):
         self.form_panel.case_selector.installEventFilter(self)
         # ---------- 右侧 BT + ASR + LLM 区域 ----------
         self.bt_panel= ui.components.bt_panel.BTPanel()
-        self.asr_panel=ui.components.asr_panel.ASRPanel(self.audio_receive,self.text_queue,self.llm_manager)
+        self.asr_panel=ui.components.asr_panel.ASRPanel(self.text_queue,self.llm_manager,self.audio_receive)
         self.llm_panel = ui.components.llm_panel.LLMPanel(self.llm_manager,self.form_panel)
 
         # 连接病历保存信号
@@ -169,13 +168,15 @@ class VoiceApp(QWidget):
     def start_recording(self):
         if not self.form_panel.case_id.text().strip():
             self.case_input()
+        if self._is_recording:
+            logger.warning("⏳ 上一轮还未清理完，等待中...")
+            return
         device = self.asr_panel.input_device.currentData()
         logger.info(f"Using input device {device}")
-        while self.start_event.is_set():
-            logger.warning("⏳ 上一轮还未清理完，等待中...")
-            time.sleep(0.1)
-        self.start_event.set()
-        # 更新按钮状态
+        
+        self._is_recording = True
+        self.control_queue.put('start')
+        
         self.bt_panel.mic_start.setEnabled(False)
         self.bt_panel.mic_stop.setEnabled(True)
         self.bt_panel.mic_stop.setStyleSheet("""
@@ -194,9 +195,9 @@ class VoiceApp(QWidget):
         self.form_panel.del_case.setEnabled(False)
 
     def stop_recording(self):
-        self.stop_event.set()
-        # 更新按钮状态
-        # self.asr_panel.reset_waveform()
+        self.control_queue.put('stop')
+        self._is_recording = False
+        
         self.bt_panel.mic_start.setEnabled(True)
         self.bt_panel.mic_stop.setEnabled(False)
         self.bt_panel.mic_stop.setStyleSheet("")

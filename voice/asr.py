@@ -1,4 +1,9 @@
 # 新版 StreamVadAsr：VAD切段 + ASR识别 + ReID打标签
+import torch
+from torch.serialization import add_safe_globals
+from torch.torch_version import TorchVersion
+
+add_safe_globals([TorchVersion])
 import queue
 from threading import Thread
 from loguru import logger
@@ -239,10 +244,30 @@ def run(kwargs):
     from utils.loger_util import init_subprocess_logger
     import os
     init_subprocess_logger(os.path.join(cfg.get("app", "save_dir"),"log"),"asr")
-    """多进程录音主入口，可被循环控制"""
+    control_queue = kwargs.get('control_queue')
     audio_queue: Queue = kwargs['audio_queue']
     text_queue: Queue = kwargs['text_queue']
     
-
-    StreamVadAsr(audio_queue,text_queue).start()
+    asr_processor = StreamVadAsr(audio_queue, text_queue)
+    
+    logger.info("🎯 ASR 进程初始化完成，自动启动...")
+    asr_processor.start()
+    logger.info("✅ ASR 已自动启动，持续监听音频队列...")
+    
+    while True:
+        try:
+            if control_queue is not None:
+                try:
+                    cmd = control_queue.get(timeout=1)
+                    logger.info(f"📥 ASR 收到命令: {cmd}")
+                    
+                    if cmd == 'exit':
+                        logger.info("🛑 收到退出命令，ASR 进程即将退出")
+                        break
+                except:
+                    pass
+        except Exception as e:
+            logger.error(f"ASR 进程异常: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
